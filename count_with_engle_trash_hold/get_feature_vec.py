@@ -9,6 +9,12 @@ right_joint_list = np.array(left_joint_list) + 1
 
 
 def get_angles(scelton_points: np.ndarray, right_side: bool):
+    """
+    use the coordinates (x,y) of the
+    :param scelton_points:
+    :param right_side:
+    :return:
+    """
     # Loop through joint sets
     angles = []
     if right_side:
@@ -21,6 +27,17 @@ def get_angles(scelton_points: np.ndarray, right_side: bool):
         c = np.array([scelton_points[joint[2]].x, scelton_points[joint[2]].y])  # Third coord
         radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
         angle = np.abs(radians * 180.0 / np.pi)
+        #choose higer angle
+        if (a[1] + ((c-a)[1]/(c-a)[0])*(b[0]-a[0])) >b[1]:
+        #if b[1]<a[1] and b[1]<c[1]:
+            # choose blunt angle
+            if angle < 180:
+                angle = 360 - angle
+        else:
+            if angle > 180:
+                angle = 360 - angle
+        #if right_side:
+         #   angle = 360 - angle
         # if angle > 180.0:
         #     angle = 360 - angle
         angles.append(angle)
@@ -36,7 +53,7 @@ def get_min_visability(scelton_points: np.ndarray, right_side: bool):
     for joint in joint_list:
         angle_vis = [scelton_points[point].visibility for point in joint]
         visability_vector.append(min(angle_vis))
-    return visability_vector
+    return np.array(visability_vector)
 
 
 def choose_side(scelton_points: np.ndarray):
@@ -45,7 +62,14 @@ def choose_side(scelton_points: np.ndarray):
     return right_vis > left_vis
 
 
-def get_angular_volcity(angels: np.ndarray, time):
+def get_angular_velocity(angels: np.ndarray, time):
+    """
+    return velocity vector, take last frame from angels matrix and subtract the first frame from it
+    and dived by time delta
+    :param angels: matrix ech row is a new frame
+    :param time:vector of time that ech frame taken at
+    :return:
+    """
     # Loop through joint sets
     angle_delta = angels[-1] - angels[0]
     return angle_delta / (time[-1] - time[-0])
