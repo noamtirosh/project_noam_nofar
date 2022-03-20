@@ -9,8 +9,8 @@ visibility_threshold = 0.80
 
 n_sequence_direction = 4
 num_frames_for_velocity = 2
-up_direction = np.array([1,1])
-down_direction = np.array([-1,-1])
+up_direction = np.array([1,-1])
+down_direction = np.array([-1,1])
 joint_to_use = [3,4]
 
 
@@ -64,7 +64,10 @@ def check_visible(landmark, indexes):
 def choose_position_by_v(velacity_vector: np.ndarray, direction_vector: np.ndarray, threshold_vector: np.ndarray,
                          last_frames_arr: np.ndarray):
     if not np.any(np.abs(velacity_vector) < threshold_vector):
-        add_to_frames = np.dot(velacity_vector,direction_vector)
+        if np.any((velacity_vector * direction_vector) < 0):
+            add_to_frames = -1
+        else:
+            add_to_frames = 1
     else:
         add_to_frames = 0
     for ind, frame in enumerate(last_frames_arr[1:]):
@@ -84,10 +87,10 @@ for using video from the computer use cv2.VideoCapture(video_path)
 
 # video_path = r"C:\Users\noam\Downloads\VID_20211128_163923 (1).mp4"
 # video_path = r"C:\Users\noam\Downloads\WhatsApp Video 2022-03-20 at 09.12.16.mp4"
-# video_path = r"C:\Users\noam\Downloads\VID_20211128_164022.mp4"
+video_path = r"C:\Users\noam\Downloads\VID_20211128_164022.mp4"
 #video_path = r"C:\Users\noam\Downloads\VID_20211128_163923 (2).mp4"
 #video_path = r"C:\Users\noam\Downloads\הרמה_תקינה (1).mp4"
-video_path = r"C:\Users\noam\Downloads\אגן_לא_סימטרי (2).mp4"
+#video_path = r"C:\Users\noam\Downloads\אגן_לא_סימטרי (2).mp4"
 cap = cv2.VideoCapture(video_path)
 
 
