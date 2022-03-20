@@ -2,6 +2,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 from get_feature_vec import get_angles, get_angular_velocity, get_min_visability, choose_side
+from save_to_csv import create_first_row , export_landmarks
 
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
@@ -108,6 +109,8 @@ v_angle_direction = up_direction
 v_angle_threshold = np.array([1,0.2])
 
 stage = "down"
+
+create_first_row()
 # Setup mediapipe instance
 with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
     while cap.isOpened():
@@ -127,6 +130,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
         # Extract landmarks
         try:
             landmarks = results.pose_landmarks.landmark
+            export_landmarks(landmarks,stage)
             mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
                                       mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=2),
                                       mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2)
