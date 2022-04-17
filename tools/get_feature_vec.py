@@ -3,9 +3,9 @@ import mediapipe as mp
 import numpy as np
 from dataclasses import dataclass
 
-
 # right side
-left_joint_list = [[13, 15, 17], [11, 13, 15], [23, 11, 13], [25, 23, 11], [27, 25, 23],[31, 27, 25]]  # wrist elbow shoulder hip knee ankle
+left_joint_list = [[13, 15, 17], [11, 13, 15], [23, 11, 13], [25, 23, 11], [27, 25, 23],
+                   [31, 27, 25]]  # wrist elbow shoulder hip knee ankle
 # left side
 right_joint_list = np.array(left_joint_list) + 1
 
@@ -16,7 +16,7 @@ class SceltonPoint:
     x: float
     y: float
     z: float
-    visibility:float = 0
+    visibility: float = 0
 
 
 def get_angles(scelton_points: np.ndarray, right_side: bool):
@@ -36,25 +36,23 @@ def get_angles(scelton_points: np.ndarray, right_side: bool):
         a = np.array([scelton_points[joint[0]].x, scelton_points[joint[0]].y])  # First coord
         b = np.array([scelton_points[joint[1]].x, scelton_points[joint[1]].y])  # Second coord
         c = np.array([scelton_points[joint[2]].x, scelton_points[joint[2]].y])  # Third coord
-        angle = culc_angle(a, b, c)
+        angle = cucl_angle(a, b, c)
         angles.append(angle)
     return angles
 
 
-def culc_angle(a, b, c):
+def cucl_angle(a, b, c):
     radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
     angle = np.abs(radians * 180.0 / np.pi)
+    if type(angle) == np.float64:
+        angle = np.array(angle)
     # choose higer angle
-    if (a[1] + ((c - a)[1] / (c - a)[0]) * (b[0] - a[0])) > b[1]:
-        # if b[1]<a[1] and b[1]<c[1]:
-        # choose blunt angle
-        if angle < 180:
-            angle = 360 - angle
-    else:
-        if angle > 180:
-            angle = 360 - angle
+    mask = (a[1] + ((c - a)[1] / (c - a)[0]) * (b[0] - a[0])) > b[1]
+    blunt_angle = angle[mask]
+    blunt_angle[blunt_angle < 180] = 360 - blunt_angle[blunt_angle < 180]
+    angle[angle>180] = 360 - angle[angle>180]
+    angle[mask] = blunt_angle
     return angle
-
 
 
 def get_min_visability(scelton_points: np.ndarray, right_side: bool):

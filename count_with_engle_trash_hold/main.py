@@ -1,8 +1,10 @@
 import cv2
 import mediapipe as mp
 import numpy as np
-from get_feature_vec import get_angles, get_angular_velocity, get_min_visability, choose_side
-from save_to_csv import create_first_row , export_landmarks
+#from get_feature_vec import get_angles, get_angular_velocity, get_min_visability, choose_side
+from tools.get_feature_vec import get_angles, get_angular_velocity, get_min_visability, choose_side
+
+from save_to_csv import create_first_row, export_landmarks
 
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
@@ -10,56 +12,9 @@ visibility_threshold = 0.80
 
 n_sequence_direction = 4
 num_frames_for_velocity = 2
-up_direction = np.array([1,-1])
-down_direction = np.array([-1,1])
-joint_to_use = [3,4]
-
-
-def calculate_2d_angles(landmarks, joint_list):
-    # Loop through joint sets
-    angles = []
-    for joint in joint_list:
-        a = np.array([landmarks[joint[0]].x, landmarks[joint[0]].y])  # First coord
-        b = np.array([landmarks[joint[1]].x, landmarks[joint[1]].y])  # Second coord
-        c = np.array([landmarks[joint[2]].x, landmarks[joint[2]].y])  # Third coord
-        radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
-        angle = np.abs(radians * 180.0 / np.pi)
-        if angle > 180.0:
-            angle = 360 - angle
-        angles.append(angle)
-
-
-def calculate_angle(a, b, c):
-    a = np.array(a)  # First
-    b = np.array(b)  # Mid
-    c = np.array(c)  # End
-    v_1 = c - b
-    v_2 = a - b
-    cos_teta = np.inner(v_1, v_2) / (np.linalg.norm(v_1) * np.linalg.norm(v_2))
-    rad = np.arccos(cos_teta)
-    # radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
-    angle = np.abs(rad * 180.0 / np.pi)
-    if angle > 180.0:
-        angle = 360 - angle
-    return angle
-
-
-def calculate_2d_angle(a, b, c):
-    a = np.array(a)  # First
-    b = np.array(b)  # Mid
-    c = np.array(c)  # End
-
-    radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
-    angle = np.abs(radians * 180.0 / np.pi)
-
-    if angle > 180.0:
-        angle = 360 - angle
-
-    return angle
-
-
-def check_visible(landmark, indexes):
-    return sum(landmark[indexes].visibility)
+up_direction = np.array([1, -1])
+down_direction = np.array([-1, 1])
+joint_to_use = [3, 4]
 
 
 def choose_position_by_v(velacity_vector: np.ndarray, direction_vector: np.ndarray, threshold_vector: np.ndarray,
@@ -89,11 +44,10 @@ for using video from the computer use cv2.VideoCapture(video_path)
 # video_path = r"C:\Users\noam\Downloads\VID_20211128_163923 (1).mp4"
 # video_path = r"C:\Users\noam\Downloads\WhatsApp Video 2022-03-20 at 09.12.16.mp4"
 video_path = r"C:\Users\noam\Downloads\VID_20211128_164022.mp4"
-#video_path = r"C:\Users\noam\Downloads\VID_20211128_163923 (2).mp4"
-#video_path = r"C:\Users\noam\Downloads\הרמה_תקינה (1).mp4"
-#video_path = r"C:\Users\noam\Downloads\אגן_לא_סימטרי (2).mp4"
+# video_path = r"C:\Users\noam\Downloads\VID_20211128_163923 (2).mp4"
+# video_path = r"C:\Users\noam\Downloads\הרמה_תקינה (1).mp4"
+# video_path = r"C:\Users\noam\Downloads\אגן_לא_סימטרי (2).mp4"
 cap = cv2.VideoCapture(video_path)
-
 
 """
 global variables for the counting
@@ -106,7 +60,7 @@ is_right_side = False
 
 last_frames_arr = np.zeros(n_sequence_direction)
 v_angle_direction = up_direction
-v_angle_threshold = np.array([1,0.2])
+v_angle_threshold = np.array([1, 0.2])
 
 stage = "down"
 
@@ -114,6 +68,7 @@ create_first_row()
 # Setup mediapipe instance
 with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
     while cap.isOpened():
+        input_fps = cap.get(cv2.CAP_PROP_FPS)
         ret, frame = cap.read()
 
         # Recolor image to RGB
@@ -130,13 +85,13 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
         # Extract landmarks
         try:
             landmarks = results.pose_landmarks.landmark
-            export_landmarks(landmarks,stage)
+            export_landmarks(landmarks, stage)
             mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
                                       mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=2),
                                       mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2)
                                       )
 
-            cv2.imshow('Mediapipe Feed', image)
+            # cv2.imshow('Mediapipe Feed', image)
             if counter == 0:
                 is_right_side = choose_side(landmarks)
             angels = get_angles(landmarks, is_right_side)
@@ -153,7 +108,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
 
                 if np.any(angels_visability[joint_to_use] < visibility_threshold):
                     rec_color = (117, 16, 245)  # set rec color to red
-                   #stage = "not_visible"
+                # stage = "not_visible"
                 else:
                     rec_color = (117, 245, 16)  # set rec color to red
                     if choose_position_by_v([angular_velocity[joint_to_use]], v_angle_direction, v_angle_threshold,
@@ -199,7 +154,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
                     cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 2, cv2.LINE_AA)
 
         # Render detections
-        cv2.imshow('Mediapipe Feed', image)
+        cv2.imshow('Mediapipe Feed', image, )
         # print(hip[0:])
         if cv2.waitKey(10) & 0xFF == ord('q'):
             break
