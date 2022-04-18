@@ -1,6 +1,8 @@
 import cv2
 import mediapipe as mp
 import numpy as np
+import glob
+
 # from get_feature_vec import get_angles, get_angular_velocity, get_min_visability, choose_side
 from tools.get_feature_vec import get_angles, get_angular_velocity, get_min_visability, choose_side
 from tools.save_to_csv import create_first_row, export_landmarks
@@ -25,7 +27,6 @@ def manual_create(video_list: list, csv_file_name: str, run_video: bool = False)
                 # Recolor back to BGR
                 image.flags.writeable = True
                 image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-                rec_color = (117, 16, 245)
                 try:
                     landmarks = results.pose_landmarks.landmark
                     # cv2.imshow('Mediapipe Feed', image)
@@ -35,7 +36,8 @@ def manual_create(video_list: list, csv_file_name: str, run_video: bool = False)
                                               mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2,
                                                                      circle_radius=2)
                                               )
-                    cv2.imshow('Mediapipe Feed', image, )
+                    imS = cv2.resize(image, (960, 540))  # Resize image
+                    cv2.imshow('Mediapipe Feed', imS)
                     k = cv2.waitKey(10)
                     while k != ord('n'):
                         if k == ord('u'):
@@ -61,11 +63,7 @@ def manual_create(video_list: list, csv_file_name: str, run_video: bool = False)
 
 
 if __name__ == '__main__':
-    # video_path = r"C:\Users\noam\Downloads\VID_20211128_163923 (1).mp4"
-    # video_path = r"C:\Users\noam\Downloads\WhatsApp Video 2022-03-20 at 09.12.16.mp4"
-    # video_path = r"C:\Users\noam\Downloads\VID_20211128_164022.mp4"
 
-    video_list = [r"C:\Users\noam\Downloads\VID_20211128_163923 (1).mp4",
-                  r"C:\Users\noam\Downloads\WhatsApp Video 2022-03-20 at 09.12.16.mp4",
-                  r"C:\Users\noam\Downloads\VID_20211128_164022.mp4"]
-    manual_create(video_list, "test_csv.csv", True)
+    folder_to_use = r"C:\Users\noam\Videos\project\currect"
+    video_list = glob.glob(folder_to_use+r"\*.mp4")
+    manual_create(video_list, folder_to_use +r"\data.csv", False)

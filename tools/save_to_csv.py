@@ -24,7 +24,7 @@ def create_first_row(csv_name: str = "data.csv", over_write: bool = False):
         return
     # init csv_file
     landmarks = ["class"]
-    for val in range(1, 33 + 1):
+    for val in range(0, 32 + 1):
         landmarks += ['x{}'.format(val), 'y{}'.format(val), 'z{}'.format(val), 'v{}'.format(val)]
     with open(csv_name, mode='w', newline='') as f:
         csv_writer = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
