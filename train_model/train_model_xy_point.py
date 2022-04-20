@@ -32,10 +32,11 @@ class Classifier(nn.Module):
 if __name__ == '__main__':
     data_csv_file = r"C:\Users\noam\Videos\project\currect\data1.csv"
     pose_datasets = CsvDataset(file=data_csv_file)
+    #pose_datasets.add_miror()
     pose_datasets.point_loc_process()
     train_dataset, validation_dataset = pose_datasets.df_to_datasets('class')
-    train_data_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    validation_data_loader =  DataLoader(validation_dataset, batch_size=32, shuffle=True)
+    train_data_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+    validation_data_loader =  DataLoader(validation_dataset, batch_size=64, shuffle=True)
 
     model = Classifier()
     criterion = nn.NLLLoss()

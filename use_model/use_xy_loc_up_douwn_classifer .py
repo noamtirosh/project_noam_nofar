@@ -17,7 +17,7 @@ mp_pose = mp.solutions.pose
 mp_drawing = mp.solutions.drawing_utils
 
 #init video
-video_path = r"C:\Users\noam\Videos\project\VID_20220102_124819.mp4"
+video_path = r"C:\Users\noam\Downloads\correct_shanit.mp4"
 cap = cv2.VideoCapture(video_path)
 
 with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:

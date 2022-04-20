@@ -24,14 +24,14 @@ class CsvDataset:
             a = np.array([df['x' + str(joint[0])], df['y' + str(joint[0])]])
             b = np.array([df['x' + str(joint[1])], df['y' + str(joint[1])]])
             c = np.array([df['x' + str(joint[2])], df['y' + str(joint[2])]])
-            angel_data['angleL' + str(ind)] = cucl_angle(a, b, c) / 360  # for normalize
+            angel_data['angleL' + str(ind)] = culc_angle(a, b, c) / 360  # for normalize
             angel_data['vis_angleL' + str(ind)] = np.min(
                 [df['v' + str(joint[0])], df['v' + str(joint[1])], df['v' + str(joint[2])]])
         for ind, joint in enumerate(right_joint_list):
             a = np.array([df['x' + str(joint[0])], df['y' + str(joint[0])]])
             b = np.array([df['x' + str(joint[1])], df['y' + str(joint[1])]])
             c = np.array([df['x' + str(joint[2])], df['y' + str(joint[2])]])
-            angel_data['angleR' + str(ind)] = cucl_angle(a, b, c) / 360  # for normalize
+            angel_data['angleR' + str(ind)] = culc_angle(a, b, c) / 360  # for normalize
             angel_data['vis_angleR' + str(ind)] = np.min(
                 [df['v' + str(joint[0])], df['v' + str(joint[1])], df['v' + str(joint[2])]])
         self.data = angel_data.copy()

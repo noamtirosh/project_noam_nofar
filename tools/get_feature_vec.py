@@ -1,5 +1,3 @@
-import cv2
-import mediapipe as mp
 import numpy as np
 from dataclasses import dataclass
 
@@ -9,6 +7,9 @@ left_joint_list = [[13, 15, 17], [11, 13, 15], [23, 11, 13], [25, 23, 11], [27, 
 # left side
 right_joint_list = np.array(left_joint_list) + 1
 
+left_tow_joints_list = [[7, 11], [11, 13], [13, 15], [15, 17], [23, 11], [25, 23], [27, 25], [31, 27]]
+right_tow_joints_list = np.array(left_tow_joints_list) + 1
+
 
 @dataclass
 class SceltonPoint:
@@ -17,6 +18,23 @@ class SceltonPoint:
     y: float
     z: float
     visibility: float = 0
+
+
+def get_angle_input(in_landmarks):
+    model_input = []
+    # left side
+    angels_l = get_angles(in_landmarks, False)
+    angels_visability_l = get_min_visability(in_landmarks, False)
+    for i in range(len(angels_l)):
+        model_input.append(angels_l[i] / 360)  # normlize
+        model_input.append(angels_visability_l[i])
+    angels = get_angles(in_landmarks, True)
+    angels_visability = get_min_visability(in_landmarks, True)
+    for i in range(len(angels)):
+        model_input.append(angels[i] / 360)  # normlize
+        model_input.append(angels_visability[i])
+
+    return model_input
 
 
 def get_angles(scelton_points: np.ndarray, right_side: bool):
@@ -36,12 +54,12 @@ def get_angles(scelton_points: np.ndarray, right_side: bool):
         a = np.array([scelton_points[joint[0]].x, scelton_points[joint[0]].y])  # First coord
         b = np.array([scelton_points[joint[1]].x, scelton_points[joint[1]].y])  # Second coord
         c = np.array([scelton_points[joint[2]].x, scelton_points[joint[2]].y])  # Third coord
-        angle = cucl_angle(a, b, c)
+        angle = culc_angle(a, b, c)
         angles.append(angle)
     return angles
 
 
-def cucl_angle(a, b, c):
+def culc_angle(a, b, c):
     radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
     angle = np.abs(radians * 180.0 / np.pi)
     if type(angle) == np.float64:
@@ -50,9 +68,19 @@ def cucl_angle(a, b, c):
     mask = (a[1] + ((c - a)[1] / (c - a)[0]) * (b[0] - a[0])) > b[1]
     blunt_angle = angle[mask]
     blunt_angle[blunt_angle < 180] = 360 - blunt_angle[blunt_angle < 180]
-    angle[angle>180] = 360 - angle[angle>180]
+    angle[angle > 180] = 360 - angle[angle > 180]
     angle[mask] = blunt_angle
     return angle
+
+
+def culc_vec_direction(a, b, is_2d=True):
+    if is_2d:
+        out_vec_dir = a[0:2] - b[0:2]
+
+    else:
+        out_vec_dir = a - b
+    out_vec_dir = out_vec_dir / np.linalg.norm(out_vec_dir,axis=0)
+    return out_vec_dir
 
 
 def get_min_visability(scelton_points: np.ndarray, right_side: bool):

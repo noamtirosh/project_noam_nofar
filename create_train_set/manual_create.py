@@ -46,6 +46,9 @@ def manual_create(video_list: list, csv_file_name: str, run_video: bool = False)
                         if k == ord('d'):
                             export_landmarks(csv_file_name, landmarks, 'douwn')
                             break
+                        if k == ord('m'):
+                            export_landmarks(csv_file_name, landmarks, 'middle')
+                            break
                         if k == ord('q'):
                             exit()
                         if run_video:

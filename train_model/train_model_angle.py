@@ -2,46 +2,25 @@ import torch
 from torch import nn, optim
 from tools.process_csv import CsvDataset
 from torch.utils.data import DataLoader
-import torch.nn.functional as F
-# %matplotlib inline
-# %config InlineBackend.figure_format = 'retina'
 import matplotlib.pyplot as plt
+from genric_net.genric_net import Network
 
-
-class Classifier(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.fc1 = nn.Linear(24, 12)
-        self.fc2 = nn.Linear(12, 24)
-        self.fc3 = nn.Linear(24, 2)
-        # self.fc4 = nn.Linear(64, 10)
-        # Dropout module with 0.3 drop probability
-        self.dropout = nn.Dropout(p=0.3)
-
-    def forward(self, x):
-        # make sure input tensor is flattened
-        x = x.view(x.shape[0], -1)
-        x = self.dropout(F.relu(self.fc1(x)))
-        x = self.dropout(F.relu(self.fc2(x)))
-        # x = F.relu(self.fc2(x))
-        # x = F.relu(self.fc3(x))
-        x = F.log_softmax(self.fc3(x), dim=1)
-
-        return x
+model = Network(24, 2, [12, 24], drop_p=0.3)
 
 
 
 if __name__ == '__main__':
-    data_csv_file = r"C:\Users\noam\Videos\project\currect\data1.csv"
+    data_csv_file = r"C:\git_repos\project_noam_nofar\csv_files\up_down_classifiction.csv"
     pose_datasets = CsvDataset(file=data_csv_file)
+    pose_datasets.add_miror()
     pose_datasets.angle_process()
     train_dataset, validation_dataset = pose_datasets.df_to_datasets('class')
     train_data_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    validation_data_loader =  DataLoader(validation_dataset, batch_size=32, shuffle=True)
+    validation_data_loader = DataLoader(validation_dataset, batch_size=32, shuffle=True)
 
-    model = Classifier()
     criterion = nn.NLLLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.003)
+    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+    #optimizer = optim.Adam(model.parameters(), lr=0.003)
 
     epochs = 70
 
@@ -52,6 +31,7 @@ if __name__ == '__main__':
             optimizer.zero_grad()
 
             log_ps = model(images)
+
             loss = criterion(log_ps, labels)
             tot_train_loss += loss.item()
 
@@ -94,6 +74,12 @@ if __name__ == '__main__':
     #               'hidden_layers': 12,
     #               'state_dict': model.state_dict()}
     # torch.save(checkpoint, 'checkpoint.pth')
-    torch.save(model.state_dict(), 'checkpoint_angle.pth')
+    # torch.save(model.state_dict(), 'checkpoint_angle20.4.pth')
+    checkpoint = {'input_size': 24,
+                  'output_size': 2,
+                  'hidden_layers': [each.out_features for each in model.hidden_layers],
+                  'state_dict': model.state_dict()}
+
+    torch.save(checkpoint, 'model_angle20.4.pth.pth')
 
 
