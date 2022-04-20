@@ -94,18 +94,15 @@ class CsvDataset:
         for ind, tow_joints in enumerate(left_tow_joints_list):
             a = np.array([data['x' + str(tow_joints[0])], data['y' + str(tow_joints[0])]])
             b = np.array([data['x' + str(tow_joints[1])], data['y' + str(tow_joints[1])]])
-            vec_dir = culc_vec_direction(a, b)
-            radians = np.arctan2(vec_dir[1], vec_dir[0])
-            degrees = np.degrees(radians)
-            degrees[]
-            add_to['vec_dir' + str(ind)] = np.abs(radians * 180.0 / np.pi)
+            add_to['vec_dir' + str(ind)] = culc_vec_direction(a, b)/360
             add_to['vis_vec_dir' + str(ind)] = np.min(
                 [data['v' + str(tow_joints[0])], data['v' + str(tow_joints[1])]])
         # right side
         for ind, tow_joints in enumerate(right_tow_joints_list):
             a = np.array([data['x' + str(tow_joints[0])], data['y' + str(tow_joints[0])]])
             b = np.array([data['x' + str(tow_joints[1])], data['y' + str(tow_joints[1])]])
-            add_to['vec_dir' + str(ind + len(left_tow_joints_list))] = culc_vec_direction(a, b)
+
+            add_to['vec_dir' + str(ind + len(left_tow_joints_list))]  = culc_vec_direction(a, b)/360
             add_to['vis_vec_dir' + str(ind + len(left_tow_joints_list))] = np.min(
                 [data['v' + str(tow_joints[0])], data['v' + str(tow_joints[1])]])
 
@@ -132,15 +129,9 @@ class CsvDataset:
         tensor_val_labels = torch.tensor(val_labels.values, dtype=torch.long)
         return TensorDataset(tensor_train, tensor_train_labels), TensorDataset(tensor_val, tensor_val_labels)
 
+    def get_num_class(self):
+        return self.dataframe.nunique()
 
-def load_dataset(csv_data):
-    df = pd.read_csv(csv_data)
-    # print(f'Top5 datas: \n{df.head()}')
-    # print(f'Last5 datas: \n{df.tail()}')
-    # print(f'Specific class: \n', df[df['class']=='bridge'])  # Show specific class data.
-
-    features = df.drop('class', axis=1)  # Features, drop the colum 1 of 'class'.
-    target_value = df['class']  # target value.
 
 
 if __name__ == '__main__':

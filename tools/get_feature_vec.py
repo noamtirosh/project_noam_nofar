@@ -37,6 +37,33 @@ def get_angle_input(in_landmarks):
     return model_input
 
 
+def get_vec_input(in_landmarks):
+    # left side
+    model_input = []
+    for ind, tow_joints in enumerate(left_tow_joints_list):
+        a = np.array([in_landmarks[tow_joints[0]].x, in_landmarks[tow_joints[0]].y])
+        b = np.array([in_landmarks[tow_joints[1]].x, in_landmarks[tow_joints[1]].y])
+        model_input.append(culc_vec_direction(a, b) / 360)
+        model_input.append(min(in_landmarks[tow_joints[0]].visibility,
+                                  in_landmarks[tow_joints[1]].visibility))
+
+    # right side
+    for ind, tow_joints in enumerate(right_tow_joints_list):
+        a = np.array([in_landmarks[tow_joints[0]].x, in_landmarks[tow_joints[0]].y])
+        b = np.array([in_landmarks[tow_joints[1]].x, in_landmarks[tow_joints[1]].y])
+        model_input.append(culc_vec_direction(a, b) / 360)
+        model_input.append(min(in_landmarks[tow_joints[0]].visibility,
+                                  in_landmarks[tow_joints[1]].visibility))
+    return model_input
+
+
+def get_angle_vec_input(in_landmarks):
+    model_input = get_angle_input(in_landmarks)
+    vec_input = get_vec_input(in_landmarks)
+    model_input.extend(vec_input)
+    return model_input
+
+
 def get_angles(scelton_points: np.ndarray, right_side: bool):
     """
     use the coordinates (x,y) of the
@@ -73,14 +100,15 @@ def culc_angle(a, b, c):
     return angle
 
 
-def culc_vec_direction(a, b, is_2d=True):
+def culc_vec_direction(a: np.ndarray, b: np.ndarray, is_2d: bool = True):
     if is_2d:
         out_vec_dir = a[0:2] - b[0:2]
 
     else:
         out_vec_dir = a - b
-    out_vec_dir = out_vec_dir / np.linalg.norm(out_vec_dir,axis=0)
-    return out_vec_dir
+    out_vec_dir = out_vec_dir / np.linalg.norm(out_vec_dir, axis=0)
+    radians = np.arctan2(out_vec_dir[1], out_vec_dir[0])
+    return np.degrees(radians) + 180.0
 
 
 def get_min_visability(scelton_points: np.ndarray, right_side: bool):
