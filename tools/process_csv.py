@@ -3,7 +3,6 @@ from tools.get_feature_vec import *
 import torch
 from torch.utils.data import TensorDataset
 
-
 class CsvDataset:
 
     def __init__(self, file):
@@ -77,8 +76,9 @@ class CsvDataset:
             # 'v22', 'v23', 'v24', 'v25', 'v26', 'v27', 'v28', 'v29', 'v30', 'v31',
             # 'v32', 'v33',
         ]
-        xyz_data.drop(columns_removed, axis='columns', inplace=True)
+        # xyz_data.drop(columns_removed, axis='columns', inplace=True)
         xyz_data.drop(xyz_data.filter(regex='z').columns, axis='columns', inplace=True)
+        xyz_data.drop(xyz_data.filter(regex='v').columns, axis='columns', inplace=True)
         self.data = xyz_data.copy()
 
     def vec_dir_process(self):
@@ -94,7 +94,7 @@ class CsvDataset:
         for ind, tow_joints in enumerate(left_tow_joints_list):
             a = np.array([data['x' + str(tow_joints[0])], data['y' + str(tow_joints[0])]])
             b = np.array([data['x' + str(tow_joints[1])], data['y' + str(tow_joints[1])]])
-            add_to['vec_dir' + str(ind)] = culc_vec_direction(a, b)/360
+            add_to['vec_dir' + str(ind)] = culc_vec_direction(a, b) / 360
             add_to['vis_vec_dir' + str(ind)] = np.min(
                 [data['v' + str(tow_joints[0])], data['v' + str(tow_joints[1])]])
         # right side
@@ -102,7 +102,7 @@ class CsvDataset:
             a = np.array([data['x' + str(tow_joints[0])], data['y' + str(tow_joints[0])]])
             b = np.array([data['x' + str(tow_joints[1])], data['y' + str(tow_joints[1])]])
 
-            add_to['vec_dir' + str(ind + len(left_tow_joints_list))]  = culc_vec_direction(a, b)/360
+            add_to['vec_dir' + str(ind + len(left_tow_joints_list))] = culc_vec_direction(a, b) / 360
             add_to['vis_vec_dir' + str(ind + len(left_tow_joints_list))] = np.min(
                 [data['v' + str(tow_joints[0])], data['v' + str(tow_joints[1])]])
 
@@ -130,8 +130,18 @@ class CsvDataset:
         return TensorDataset(tensor_train, tensor_train_labels), TensorDataset(tensor_val, tensor_val_labels)
 
     def get_num_class(self):
-        return self.dataframe.nunique()
+        return self.dataframe["class"].nunique()
 
+    def make_classes_samples_eq(self):
+        df = self.dataframe
+        new_df = pd.DataFrame()
+        num_of_class = int(df["class"].nunique())
+        min_num_samples = df[df["class"] == 0]["class"].count()
+        for i in range(1, num_of_class):
+            min_num_samples = min(df[df["class"] == i]["class"].count(), min_num_samples)
+        for i in range(num_of_class):
+            new_df = new_df.append(df[df["class"] == i].sample(n=min_num_samples))
+        self.dataframe = new_df
 
 
 if __name__ == '__main__':

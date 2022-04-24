@@ -1,0 +1,5 @@
+0 - currect
+1 - hip_problem
+2 - neck_problem
+3 - hands_problem
+4 - fast_down

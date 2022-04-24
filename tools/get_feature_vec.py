@@ -86,6 +86,14 @@ def get_angles(scelton_points: np.ndarray, right_side: bool):
     return angles
 
 
+def get_point_loc_input(in_landmarks):
+    model_input = []
+    for joint in in_landmarks:
+        model_input.append(joint.x)
+        model_input.append(joint.y)
+        model_input.append(joint.z)
+    return model_input
+
 def culc_angle(a, b, c):
     radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
     angle = np.abs(radians * 180.0 / np.pi)

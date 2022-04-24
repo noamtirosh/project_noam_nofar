@@ -22,7 +22,7 @@ if __name__ == '__main__':
     optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
     #optimizer = optim.Adam(model.parameters(), lr=0.003)
 
-    epochs = 70
+    epochs = 30
 
     train_losses, test_losses = [], []
     for e in range(epochs):
