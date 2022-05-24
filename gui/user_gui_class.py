@@ -7,18 +7,16 @@ import mediapipe as mp
 import torch
 from genric_net.genric_net import load_network
 import numpy as np
-from tools.get_feature_vec import get_angle_vec_input, get_min_visability, get_vec_input, choose_side
+from tools.get_feature_vec import get_angle_vec_input, get_min_visability, get_angle_input, choose_side
 import csv
 import os
 from datetime import datetime
-
-
 
 # const
 VIS_THRESHOLD = 0.80
 MISTAKE_P_THRESHOLD = 0.7
 STATE_POS_THRESHOLD = 0.97
-P_OF_REP = 0.1
+P_OF_REP = 0.4
 P_OF_SET = 0.2
 
 RED_COLOR = (117, 16, 245)
@@ -31,8 +29,6 @@ MIDDLE_POS = 2
 
 TIME_TO_CHECK_MISTAKES = 2000
 TIME_IN_START_POS_TO_START = 4000
-
-
 
 
 class UserGui:
@@ -67,13 +63,13 @@ class UserGui:
         self.width = self.Surface.get_width()
         # stores the height of the screen into a variable
         self.height = self.Surface.get_height()
-        self.button_width = int(self.width/5)
-        self.button_height = int(self.height/5)
+        self.button_width = int(self.width / 5)
+        self.button_height = int(self.height / 5)
         icon = pygame.Surface((1, 1))
         icon.set_alpha(0)
         pygame.display.set_icon(icon)
         pygame.display.set_caption("[Program] - [Author] - [Version] - [Date]")
-        pygame.mouse.set_visible(False)
+        pygame.mouse.set_visible(True)
         pygame.event.set_grab(True)
         # print(pygame.display.Info())
 
@@ -88,6 +84,21 @@ class UserGui:
         pass
 
     def init_exercise(self, exercise_dict):
+
+        # reset exercise vars
+        self.rep_counter = 0
+        self.set_counter = 0
+        self.visible_flag = False
+        self.is_exe_started = False
+        self.is_exe_ended = False
+        self.visible_flag = False
+        self.current_state = START_POS
+
+        self.state_p, self.pos_state = 0, 0
+
+        self.state_mistake_arr = np.zeros([3, 5])
+        self.set_mistake_arr = np.zeros([3, 5])
+
         # get exercise params from json
         self.count_model = load_network(exercise_dict['count_model_path'])
         self.start_pos_model = load_network(exercise_dict['down_model_path'])
@@ -101,6 +112,11 @@ class UserGui:
         self.break_between_sets = exercise_dict['break_time']
         self.time_var = pygame.time.get_ticks()
         self.user_message = r'stand before the camera'
+        self.start_state_err_map = exercise_dict['start_state_error_map']
+        self.end_state_err_map = exercise_dict['end_state_error_map']
+        self.middle_state_err_map = exercise_dict['middle_state_error_map']
+        self.sound_arr = exercise_dict['err_message_sounds']
+
 
     def check_visability(self):
         if not self.visible_flag:
@@ -123,7 +139,10 @@ class UserGui:
                     self.state_mistake_arr[START_POS, mistake_ind] += 1
 
             if pygame.time.get_ticks() - self.time_var > TIME_IN_START_POS_TO_START:
-                if np.any(self.state_mistake_arr[START_POS,:] > P_OF_REP):
+                # normalize arr
+                self.state_mistake_arr[START_POS, :] = self.state_mistake_arr[START_POS, :] / self.state_mistake_arr[START_POS, :].sum()
+                # check mistake threshold and update mistake for set
+                if np.any(self.state_mistake_arr[START_POS, 1:] > P_OF_REP):
                     self.time_var = pygame.time.get_ticks()
                     # TODO play error voice
                 else:
@@ -138,49 +157,50 @@ class UserGui:
 
         # cv2.imshow('Mediapipe Feed', image)
 
-
-
-        imS = cv2.resize(self.frame, (self.width, int(self.height*4/5)))  # Resize image
+        imS = cv2.resize(self.frame, (self.width, int(self.height * 4 / 5)))  # Resize image
         impg = pygame.image.frombuffer(imS.tobytes(), imS.shape[1::-1], "BGR")
-        self.Surface.blit(impg, (0, int(self.height/5)))
+        self.Surface.blit(impg, (0, int(self.height / 5)))
         color_dark = (100, 100, 100)
         color = (255, 255, 255)
 
         # light shade of the button
         color_light = (170, 170, 170)
 
-        smallfont = pygame.font.SysFont('Corbel', int(self.button_height/2))
+        smallfont = pygame.font.SysFont('Corbel', int(self.button_height / 2))
 
         if self.user_message == '':
             # exercise name
-            pygame.draw.rect(self.Surface, color, [0, 0, 2*self.button_width, self.button_height])
+            pygame.draw.rect(self.Surface, color, [0, 0, 2 * self.button_width, self.button_height])
             text = smallfont.render(str(self.exercise_name), True, BLACK_COLOR)
-            self.Surface.blit(text, (0, int(self.height/10)/2))
+            self.Surface.blit(text, (0, int(self.height / 10) / 2))
             # skip button
-            pygame.draw.rect(self.Surface, RED_COLOR, [self.width - self.button_width, 0, self.button_width, self.button_height])
+            pygame.draw.rect(self.Surface, RED_COLOR,
+                             [self.width - self.button_width, 0, self.button_width, self.button_height])
             text = smallfont.render("SKIP", True, color)
-            self.Surface.blit(text, (self.width - self.button_width+int(self.button_height/2), int(self.button_height/4)))
+            self.Surface.blit(text, (
+            self.width - self.button_width + int(self.button_height / 2), int(self.button_height / 4)))
             # set counter
-            pygame.draw.rect(self.Surface, color_light, [2*self.button_width, 0, self.button_width, self.button_height])
+            pygame.draw.rect(self.Surface, color_light,
+                             [2 * self.button_width, 0, self.button_width, self.button_height])
             text = smallfont.render('SET', True, BLACK_COLOR)
-            self.Surface.blit(text, (2*self.button_width, 0))
+            self.Surface.blit(text, (2 * self.button_width, 0))
             text = smallfont.render(str(int(self.set_counter)) + '/' + str(int(self.n_sets)), True, color)
-            self.Surface.blit(text, (2*self.button_width, int(self.button_height/2)))
+            self.Surface.blit(text, (2 * self.button_width, int(self.button_height / 2)))
             # rep counter
-            pygame.draw.rect(self.Surface, self.rec_color, [3*self.button_width, 0, self.button_width, self.button_height])
+            pygame.draw.rect(self.Surface, self.rec_color,
+                             [3 * self.button_width, 0, self.button_width, self.button_height])
             text = smallfont.render('REPS', True, BLACK_COLOR)
-            self.Surface.blit(text, (3*self.button_width, 0))
+            self.Surface.blit(text, (3 * self.button_width, 0))
             text = smallfont.render(str(int(self.rep_counter)) + '/' + str(int(self.n_reps)), True, color)
-            self.Surface.blit(text, (3*self.button_width, int(self.height/10)))
+            self.Surface.blit(text, (3 * self.button_width, int(self.height / 10)))
         else:
             # message to user
             pygame.draw.rect(self.Surface, self.rec_color, [0, 0, self.width, self.button_height])
             text = smallfont.render(str(self.user_message), True, BLACK_COLOR)
-            self.Surface.blit(text, (0, int(self.button_height/4)))
+            self.Surface.blit(text, (0, int(self.button_height / 4)))
 
         pygame.display.update()
         # cv2.imshow('Mediapipe Feed', imS)
-
 
     def use_count_model(self):
         model_input = get_angle_vec_input(self.landmarks)
@@ -195,16 +215,16 @@ class UserGui:
         return top_p, top_class_main
 
     def use_error_model(self, state):
-        error_input = get_vec_input(self.landmarks)  # TODO change if needed
+        error_input = get_angle_input(self.landmarks)  # TODO change if needed
         error_input = torch.Tensor(error_input)
         error_ind, error_p = 0, 0
         with torch.no_grad():
             if state == START_POS:
-                error_output = self.start_pos_model.forward(error_input.view(1, 32))
+                error_output = self.start_pos_model.forward(error_input.view(1, 24))
             elif state == END_POS:
-                error_output = self.end_pos_model.forward(error_input.view(1, 32))
+                error_output = self.end_pos_model.forward(error_input.view(1, 24))
             else:
-                error_output = self.middle_pos_model.forward(error_input.view(1, 32))
+                error_output = self.middle_pos_model.forward(error_input.view(1, 24))
             ps = torch.exp(error_output)
             error_p, error_ind = ps.topk(1, dim=1)
         return error_p, error_ind
@@ -239,7 +259,7 @@ class UserGui:
 
     def check_set(self):
         if self.rep_counter >= self.n_reps:
-             self.end_set()
+            self.end_set()
         if self.set_counter >= self.n_sets:
             self.is_exe_ended = True
             # TODO handle error if needed
@@ -248,22 +268,9 @@ class UserGui:
             pass
 
     def run_exercise(self, exercise_ind):
-        # reset exercise vars
-        self.rep_counter = 0
-        self.set_counter = 0
-        self.visible_flag = False
-        self.is_exe_started = False
-        self.is_exe_ended = False
-        self.visible_flag = False
-        self.current_state = START_POS
-
-        self.state_p, self.pos_state = 0, 0
-
-        self.state_mistake_arr = np.zeros([3, 5])
-        self.set_mistake_arr = np.zeros([3, 5])
-
         exercise_dict = self.exercises_list[exercise_ind]
         self.init_exercise(exercise_dict)
+        # open message for the exercise
         self.open_message.play(0)
         with self.mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
             while self.cap.isOpened():
@@ -280,6 +287,7 @@ class UserGui:
                 except:
                     visibility = 0  # TODO check if needed
                     continue
+                # use the
                 self.state_p, self.pos_state = self.use_count_model()
 
                 if self.is_exe_started:
@@ -302,7 +310,7 @@ class UserGui:
     def get_num_of_exercise(self):
         return len(self.exercises_list)
 
-    def count_down(self, time_sec):
+    def count_down(self, time_sec, skip_message="skip break"):
         font = pygame.font.SysFont(None, 100)
         counter = time_sec
         text = font.render(str(counter), True, (0, 128, 0))
@@ -314,12 +322,25 @@ class UserGui:
             for event in pygame.event.get():
                 if event.type == timer_event:
                     text = font.render(str(counter), True, (0, 128, 0))
+                    counter -= 1
                     if counter == 0:
                         pygame.time.set_timer(timer_event, 0)
                         run = False
-            self.Surface .fill((255, 255, 255))
-            text_rect = text.get_rect(center=self.Surface .get_rect().center)
-            self.Surface .blit(text, text_rect)
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    mouse = pygame.mouse.get_pos()
+                    if self.width - self.button_width <= mouse[0] <= self.width and 0 <= mouse[1] <= self.button_height:
+                        pygame.time.set_timer(timer_event, 0)
+                        run = False
+                        # TODO handle skip break
+            self.Surface.fill((255, 255, 255))
+            text_rect = text.get_rect(center=self.Surface.get_rect().center)
+            self.Surface.blit(text, text_rect)
+            # skip button
+            pygame.draw.rect(self.Surface, RED_COLOR,
+                             [self.width - self.button_width, 0, self.button_width, self.button_height])
+            skip_text = font.render(skip_message, True, (255, 255, 255))
+            self.Surface.blit(skip_text, (self.width - self.button_width + 10, int(self.button_height / 4)))
+
             pygame.display.flip()
 
     def end_gui(self):
@@ -333,7 +354,7 @@ class UserGui:
             first_row = ["date"]
             for exercise in self.exercises_list:
                 for set_num in range(exercise['num_of_sets']):
-                    first_row += ['{}-set-{}'.format(exercise['name'],set_num+1)]
+                    first_row += ['{}-set-{}'.format(exercise['name'], set_num + 1)]
             with open(self.csv_path, mode='w', newline='') as f:
                 csv_writer = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
                 csv_writer.writerow(first_row)
@@ -358,8 +379,21 @@ class UserGui:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if self.user_message == '':
                     mouse = pygame.mouse.get_pos()
-                    if self.width - self.button_width <= mouse[0] <= self.width:
+                    if self.width - self.button_width <= mouse[0] <= self.width and 0 <= mouse[1] <= self.button_height:
                         self.end_set()
+
+    def handle_err(self, state, ind):
+        err_ind = 0
+        if state == START_POS:
+            err_ind = self.start_state_err_map[ind]
+        elif state == END_POS:
+            err_ind = self.end_state_err_map[ind]
+        elif state == MIDDLE_POS:
+            err_ind = self.middle_state_err_map[ind]
+        # play err message
+        pygame.mixer.Sound(self.sound_arr[err_ind]).play(0)
+
+
 
     def end_set(self):
         self.set_counter += 1
@@ -370,27 +404,21 @@ class UserGui:
         # normalize mistake_for_set
         self.set_mistake_arr = self.set_mistake_arr / self.n_reps
         # remove correct ind
-        self.set_mistake_arr = self.set_mistake_arr[:, 1:]
+        self.set_mistake_arr_only_err = self.set_mistake_arr[:, 1:]
         # check set threshold
-        if np.any(self.set_mistake_arr > P_OF_SET):
-            ind = np.argmax(self.set_mistake_arr)
+        if np.any(self.set_mistake_arr_only_err > P_OF_SET):
+            ind = np.argmax(self.set_mistake_arr_only_err)
+
         # TODO add error
         if self.break_between_sets:
             self.count_down(self.break_between_sets)
 
 
-
-
-
-
-
-
 if __name__ == '__main__':
     print('hi')
-    gui = UserGui(r"exercise_plan_18-5.json")
+    gui = UserGui(r"exercise_plan.json")
     for exercise_ind in range(gui.get_num_of_exercise()):
         gui.run_exercise(0)
-
 
 #
 #

@@ -10,6 +10,8 @@ right_joint_list = np.array(left_joint_list) + 1
 left_tow_joints_list = [[7, 11], [11, 13], [13, 15], [15, 17], [23, 11], [25, 23], [27, 25], [31, 27]]
 right_tow_joints_list = np.array(left_tow_joints_list) + 1
 
+cross_body_joints_list = [[9, 10], [11, 12], [23, 24], [25, 26], [27, 28]]
+
 
 @dataclass
 class SceltonPoint:
@@ -37,6 +39,18 @@ def get_angle_input(in_landmarks):
     return model_input
 
 
+def get_cross_vec_input(in_landmarks):
+    model_input = []
+    model_input = get_vec_input(in_landmarks)
+    for ind, tow_joint_cross in enumerate(cross_body_joints_list):
+        a = np.array([in_landmarks[tow_joint_cross[0]].x, in_landmarks[tow_joint_cross[0]].y])
+        b = np.array([in_landmarks[tow_joint_cross[1]].x, in_landmarks[tow_joint_cross[1]].y])
+        model_input.append(culc_vec_direction(a, b) / 360)
+        model_input.append(min(in_landmarks[tow_joint_cross[0]].visibility,
+                               in_landmarks[tow_joint_cross[1]].visibility))
+    return model_input
+
+
 def get_vec_input(in_landmarks):
     # left side
     model_input = []
@@ -45,7 +59,7 @@ def get_vec_input(in_landmarks):
         b = np.array([in_landmarks[tow_joints[1]].x, in_landmarks[tow_joints[1]].y])
         model_input.append(culc_vec_direction(a, b) / 360)
         model_input.append(min(in_landmarks[tow_joints[0]].visibility,
-                                  in_landmarks[tow_joints[1]].visibility))
+                               in_landmarks[tow_joints[1]].visibility))
 
     # right side
     for ind, tow_joints in enumerate(right_tow_joints_list):
@@ -53,7 +67,7 @@ def get_vec_input(in_landmarks):
         b = np.array([in_landmarks[tow_joints[1]].x, in_landmarks[tow_joints[1]].y])
         model_input.append(culc_vec_direction(a, b) / 360)
         model_input.append(min(in_landmarks[tow_joints[0]].visibility,
-                                  in_landmarks[tow_joints[1]].visibility))
+                               in_landmarks[tow_joints[1]].visibility))
     return model_input
 
 
@@ -91,7 +105,7 @@ def get_point_loc_input(in_landmarks):
     for joint in in_landmarks:
         model_input.append(joint.x)
         model_input.append(joint.y)
-        model_input.append(joint.z)
+        # model_input.append(joint.z)
     return model_input
 
 
@@ -104,6 +118,7 @@ def get_conv_input(in_landmarks):
         model_input.append(joint.y)
         # model_input.append(joint.visibility)
     return model_input
+
 
 def culc_angle(a, b, c):
     radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])

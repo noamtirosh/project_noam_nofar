@@ -14,7 +14,7 @@ from tools.get_feature_vec import get_angles, get_min_visability, get_angle_inpu
 # # model.load_state_dict(checkpoint['state_dict'])
 # model.load_state_dict(checkpoint)
 
-model_path = r"C:\git_repos\project_noam_nofar\train_model\model_3_state.pth"
+model_path = r"C:\git_repos\project_noam_nofar\train_model\down_angle.pth"
 model = load_network(model_path)
 
 #init media pip

@@ -10,9 +10,9 @@ model = Network(24, 2, [12, 24], drop_p=0.3)
 
 
 if __name__ == '__main__':
-    data_csv_file = r"C:\git_repos\project_noam_nofar\csv_files\up_down_classifiction.csv"
+    data_csv_file = r"C:\git_repos\project_noam_nofar\csv_files\new\down.csv"
     pose_datasets = CsvDataset(file=data_csv_file)
-    pose_datasets.add_miror()
+    # pose_datasets.add_miror()
     pose_datasets.angle_process()
     train_dataset, validation_dataset = pose_datasets.df_to_datasets('class')
     train_data_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
@@ -22,7 +22,7 @@ if __name__ == '__main__':
     optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
     #optimizer = optim.Adam(model.parameters(), lr=0.003)
 
-    epochs = 30
+    epochs = 12
 
     train_losses, test_losses = [], []
     for e in range(epochs):
@@ -80,6 +80,6 @@ if __name__ == '__main__':
                   'hidden_layers': [each.out_features for each in model.hidden_layers],
                   'state_dict': model.state_dict()}
 
-    torch.save(checkpoint, 'model_angle20.4.pth.pth')
+    torch.save(checkpoint, 'down_angle.pth')
 
 

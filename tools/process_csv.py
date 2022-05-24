@@ -2,6 +2,10 @@ import pandas as pd
 from tools.get_feature_vec import *
 import torch
 from torch.utils.data import TensorDataset
+from get_mediapipe_example_vec import FullBodyPoseEmbedder
+
+NUM_OF_LANDMARKS = 33
+
 
 class CsvDataset:
 
@@ -88,23 +92,55 @@ class CsvDataset:
         self.__add_vec_dir_to_df(vec_data, df)
         self.data = vec_data.copy()
 
+    def media_pipe_example_process(self):
+        landmarks = np.zeros([NUM_OF_LANDMARKS, 3, self.dataframe.shape[0]])
+        for i in range(0, NUM_OF_LANDMARKS):
+            landmarks[i, 0, :] = self.dataframe['x' + str(i)]
+            landmarks[i, 1, :] = self.dataframe['y' + str(i)]
+            landmarks[i, 2, :] = self.dataframe['z' + str(i)]
+        body_pose = FullBodyPoseEmbedder()
+        body_pose_output = body_pose(landmarks)
+        body_pose_output = np.swapaxes(body_pose_output, 2, 0)
+        mp_data = pd.DataFrame()
+        mp_data['class'] = self.dataframe['class']
+        for cord in range(3):
+            mp_data = pd.concat([mp_data, pd.DataFrame(body_pose_output[:, cord, :])], axis=1)
+        self.data = mp_data.copy()
+
+    def error_process(self):
+        df = self.dataframe
+        data = pd.DataFrame()
+        data['class'] = df['class']
+        self.__add_vec_dir_to_df(data, df)
+        self.__add_cross_vec_dir_to_df(data, df)
+        self.data = data.copy()
+
     @staticmethod
     def __add_vec_dir_to_df(add_to, data):
         # left side
-        for ind, tow_joints in enumerate(left_tow_joints_list):
-            a = np.array([data['x' + str(tow_joints[0])], data['y' + str(tow_joints[0])]])
-            b = np.array([data['x' + str(tow_joints[1])], data['y' + str(tow_joints[1])]])
+        for ind, two_joints in enumerate(left_tow_joints_list):
+            a = np.array([data['x' + str(two_joints[0])], data['y' + str(two_joints[0])]])
+            b = np.array([data['x' + str(two_joints[1])], data['y' + str(two_joints[1])]])
             add_to['vec_dir' + str(ind)] = culc_vec_direction(a, b) / 360
             add_to['vis_vec_dir' + str(ind)] = np.min(
-                [data['v' + str(tow_joints[0])], data['v' + str(tow_joints[1])]])
+                [data['v' + str(two_joints[0])], data['v' + str(two_joints[1])]])
         # right side
-        for ind, tow_joints in enumerate(right_tow_joints_list):
-            a = np.array([data['x' + str(tow_joints[0])], data['y' + str(tow_joints[0])]])
-            b = np.array([data['x' + str(tow_joints[1])], data['y' + str(tow_joints[1])]])
+        for ind, two_joints in enumerate(right_tow_joints_list):
+            a = np.array([data['x' + str(two_joints[0])], data['y' + str(two_joints[0])]])
+            b = np.array([data['x' + str(two_joints[1])], data['y' + str(two_joints[1])]])
 
             add_to['vec_dir' + str(ind + len(left_tow_joints_list))] = culc_vec_direction(a, b) / 360
             add_to['vis_vec_dir' + str(ind + len(left_tow_joints_list))] = np.min(
-                [data['v' + str(tow_joints[0])], data['v' + str(tow_joints[1])]])
+                [data['v' + str(two_joints[0])], data['v' + str(two_joints[1])]])
+
+    @staticmethod
+    def __add_cross_vec_dir_to_df(add_to, data):
+        for ind, two_joint_cross in enumerate(cross_body_joints_list):
+            a = np.array([data['x' + str(two_joint_cross[0])], data['y' + str(two_joint_cross[0])]])
+            b = np.array([data['x' + str(two_joint_cross[1])], data['y' + str(two_joint_cross[1])]])
+            add_to['cross_vec_dir' + str(ind)] = culc_vec_direction(a, b) / 360
+            add_to['vis_cross_vec_dir' + str(ind)] = np.min(
+                [data['v' + str(two_joint_cross[0])], data['v' + str(two_joint_cross[1])]])
 
     def combine_process(self):
         self.point_loc_process()
