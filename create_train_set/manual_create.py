@@ -30,10 +30,10 @@ def manual_create(video_list: list, csv_file_name: str, run_video: bool = False)
                 image.flags.writeable = False
                 # Make detection
                 # check if contain r\l for side
-                if Path(video).name.lower().count("r"):
+                if Path(video).name.lower().count("r") or Path(video).name.lower().count("right"):
                     right_side = image
                     left_side = cv2.flip(image, 1)
-                elif Path(video).name.lower().count("l"):
+                elif Path(video).name.lower().count("l") or Path(video).name.lower().count("left"):
                     left_side = image
                     right_side = cv2.flip(image, 1)
                 else:
