@@ -1,17 +1,37 @@
 import numpy as np
 from dataclasses import dataclass
 
+RIGHT_SIDE = 0
+LEFT_SIDE = 1
+FRONT_SIDE = 2
+
 # right side
 left_joint_list = [[13, 15, 17], [11, 13, 15], [23, 11, 13], [25, 23, 11], [27, 25, 23],
                    [31, 27, 25]]  # wrist elbow shoulder hip knee ankle
 # left side
 right_joint_list = np.array(left_joint_list) + 1
+front_joint_list = []
+front_joint_list.extend(right_joint_list)
+front_joint_list.extend(left_joint_list)
 
 left_tow_joints_list = [[7, 11], [11, 13], [13, 15], [15, 17], [23, 11], [25, 23], [27, 25], [31, 27]]
 right_tow_joints_list = np.array(left_tow_joints_list) + 1
+front_tow_joints_list = []
+front_tow_joints_list.extend(right_tow_joints_list)
+front_tow_joints_list.extend(left_tow_joints_list)
+
 
 cross_body_joints_list = [[9, 10], [11, 12], [23, 24], [25, 26], [27, 28]]
 
+# right_list, left_list = [], []
+# right_list.append(0)
+# for joint in self.mp_pose.PoseLandmark:
+#     if joint._name_.lower().count('right'):
+#         right_list.append(joint.value)
+#     else:
+#         left_list.append(joint.value)
+left_point_list = [0, 1, 2, 3, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]
+right_point_list = [0, 4, 5, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32]
 
 @dataclass
 class SceltonPoint:
@@ -25,12 +45,12 @@ class SceltonPoint:
 def get_angle_input(in_landmarks):
     model_input = []
     # left side
-    angels_l = get_angles(in_landmarks, False)
+    angels_l = get_angles_by_side(in_landmarks, False)
     angels_visability_l = get_min_visability(in_landmarks, False)
     for i in range(len(angels_l)):
         model_input.append(angels_l[i] / 360)  # normlize
         model_input.append(angels_visability_l[i])
-    angels = get_angles(in_landmarks, True)
+    angels = get_angles_by_side(in_landmarks, True)
     angels_visability = get_min_visability(in_landmarks, True)
     for i in range(len(angels)):
         model_input.append(angels[i] / 360)  # normlize
@@ -40,7 +60,6 @@ def get_angle_input(in_landmarks):
 
 
 def get_cross_vec_input(in_landmarks):
-    model_input = []
     model_input = get_vec_input(in_landmarks)
     for ind, tow_joint_cross in enumerate(cross_body_joints_list):
         a = np.array([in_landmarks[tow_joint_cross[0]].x, in_landmarks[tow_joint_cross[0]].y])
@@ -53,16 +72,15 @@ def get_cross_vec_input(in_landmarks):
 
 def get_vec_input(in_landmarks):
     # left side
-    model_input = []
-    for ind, tow_joints in enumerate(left_tow_joints_list):
-        a = np.array([in_landmarks[tow_joints[0]].x, in_landmarks[tow_joints[0]].y])
-        b = np.array([in_landmarks[tow_joints[1]].x, in_landmarks[tow_joints[1]].y])
-        model_input.append(culc_vec_direction(a, b) / 360)
-        model_input.append(min(in_landmarks[tow_joints[0]].visibility,
-                               in_landmarks[tow_joints[1]].visibility))
+    model_input = get_vec_input_by_side(in_landmarks, False)
+    model_input.extend(get_vec_input_by_side(in_landmarks, True))
+    return model_input
 
-    # right side
-    for ind, tow_joints in enumerate(right_tow_joints_list):
+
+def get_vec_input_by_side(in_landmarks, right_side):
+    joint_lists = [right_tow_joints_list, left_tow_joints_list]
+    model_input = []
+    for ind, tow_joints in enumerate(joint_lists[right_side]):
         a = np.array([in_landmarks[tow_joints[0]].x, in_landmarks[tow_joints[0]].y])
         b = np.array([in_landmarks[tow_joints[1]].x, in_landmarks[tow_joints[1]].y])
         model_input.append(culc_vec_direction(a, b) / 360)
@@ -78,7 +96,7 @@ def get_angle_vec_input(in_landmarks):
     return model_input
 
 
-def get_angles(scelton_points: np.ndarray, right_side: bool):
+def get_angles_by_side(scelton_points: np.ndarray, side: bool):
     """
     use the coordinates (x,y) of the
     :param scelton_points:
@@ -87,10 +105,8 @@ def get_angles(scelton_points: np.ndarray, right_side: bool):
     """
     # Loop through joint sets
     angles = []
-    if right_side:
-        joint_list = right_joint_list
-    else:
-        joint_list = left_joint_list
+    joint_lists = [right_joint_list,left_joint_list]
+    joint_list = joint_lists[side]
     for joint in joint_list:
         a = np.array([scelton_points[joint[0]].x, scelton_points[joint[0]].y])  # First coord
         b = np.array([scelton_points[joint[1]].x, scelton_points[joint[1]].y])  # Second coord
@@ -98,6 +114,46 @@ def get_angles(scelton_points: np.ndarray, right_side: bool):
         angle = culc_angle(a, b, c)
         angles.append(angle)
     return angles
+
+
+def get_angles(scelton_points: np.ndarray):
+    angles = get_angles_by_side(scelton_points, True)
+    angles.extend(get_angles_by_side(scelton_points, False))
+    return angles
+
+
+def get_vectors_with_side(in_landmarks, side):
+    joint_lists = [right_tow_joints_list, left_tow_joints_list]
+    model_input = []
+    for ind, tow_joints in enumerate(joint_lists[side]):
+        a = np.array([in_landmarks[tow_joints[0]].x, in_landmarks[tow_joints[0]].y])
+        b = np.array([in_landmarks[tow_joints[1]].x, in_landmarks[tow_joints[1]].y])
+        model_input.append(culc_vec_direction(a, b) / 360)
+    return model_input
+
+
+def get_vectors(in_landmarks):
+    # left side
+    model_input = get_vectors(in_landmarks, False)
+    model_input.extend(get_vectors(in_landmarks, True))
+    return model_input
+
+# model_inputs func
+
+
+def count_model_input_with_side(in_landmarks, side):
+    model_input =[]
+    angle_input = get_angles_by_side(in_landmarks, side)
+    for i in range(len(angle_input)):
+        model_input.append(angle_input[i] / 360)
+    model_input.extend(get_vectors_with_side(in_landmarks, side))
+    return model_input
+
+
+def count_model_input(in_landmarks):
+    model_input = get_angles(in_landmarks)
+    model_input.extend(get_vectors(in_landmarks))
+    return model_input
 
 
 def get_point_loc_input(in_landmarks):
@@ -108,6 +164,21 @@ def get_point_loc_input(in_landmarks):
         # model_input.append(joint.z)
     return model_input
 
+
+def get_point_loc_input_by_side(in_landmarks, side):
+    model_input = []
+    if side == LEFT_SIDE:
+        landmarks_list = left_point_list
+    elif side == RIGHT_SIDE:
+        landmarks_list = right_point_list
+    else:
+        landmarks_list = [i for i in range(len(in_landmarks)+1)]
+    for joint_ind, joint in enumerate(in_landmarks):
+        if joint_ind in landmarks_list:
+            model_input.append(joint.x)
+            model_input.append(joint.y)
+        # model_input.append(joint.z)
+    return model_input
 
 def get_conv_input(in_landmarks):
     model_input = []
@@ -143,6 +214,13 @@ def culc_vec_direction(a: np.ndarray, b: np.ndarray, is_2d: bool = True):
     out_vec_dir = out_vec_dir / np.linalg.norm(out_vec_dir, axis=0)
     radians = np.arctan2(out_vec_dir[1], out_vec_dir[0])
     return np.degrees(radians) + 180.0
+
+
+def get_min_visbility(scelton_points: np.ndarray):
+    visability_vector = []
+    for side in [True, False]:
+        visability_vector.extend(get_min_visability(scelton_points, side))
+    return visability_vector
 
 
 def get_min_visability(scelton_points: np.ndarray, right_side: bool):

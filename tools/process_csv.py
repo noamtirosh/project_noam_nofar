@@ -5,7 +5,19 @@ from torch.utils.data import TensorDataset
 from get_mediapipe_example_vec import FullBodyPoseEmbedder
 
 NUM_OF_LANDMARKS = 33
+RIGHT_SIDE = 0
+LEFT_SIDE = 1
+FRONT_SIDE = 2
 
+# right_list, left_list = [], []
+# right_list.append(0)
+# for joint in self.mp_pose.PoseLandmark:
+#     if joint._name_.lower().count('right'):
+#         right_list.append(joint.value)
+#     else:
+#         left_list.append(joint.value)
+left_point_list = [0, 1, 2, 3, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]
+right_point_list = [0, 4, 5, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32]
 
 class CsvDataset:
 
@@ -48,6 +60,16 @@ class CsvDataset:
         self.__add_vec_dir_to_df(combine_data, df)
         self.data = combine_data.copy()
 
+    def __add_angle_one_side(self, add_to, data, side):
+        joint_lists = [right_joint_list, left_joint_list, front_joint_list]
+        for ind, joint in enumerate(joint_lists[side]):
+            a = np.array([data['x' + str(joint[0])], data['y' + str(joint[0])]])
+            b = np.array([data['x' + str(joint[1])], data['y' + str(joint[1])]])
+            c = np.array([data['x' + str(joint[2])], data['y' + str(joint[2])]])
+            print(np.min(
+                [data['v' + str(joint[0])], data['v' + str(joint[1])], data['v' + str(joint[2])]]))
+            add_to['angle' + str(ind)] = culc_angle(a, b, c) / 360  # for normalize
+
     def __add_angle_to_df(self, add_to, data):
         for ind, joint in enumerate(left_joint_list):
             a = np.array([data['x' + str(joint[0])], data['y' + str(joint[0])]])
@@ -70,19 +92,39 @@ class CsvDataset:
         # df1 = pd.read_csv(dataset_csv_file, usecols=[c for c in headers if c != 'name'])
         xyz_data = self.dataframe.copy()
 
-        columns_removed = [
-            'x0', 'x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'x7', 'x8', 'x9', 'x10',
-            'y0', 'y1', 'y2', 'y3', 'y4', 'y5', 'y6', 'y7', 'y8', 'y9', 'y10',
-            'z0', 'z1', 'z2', 'z3', 'z4', 'z5', 'z6', 'z7', 'z8', 'z9', 'z10',
-            'v0', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8', 'v9', 'v10',
-
-            # 'v12', 'v13', 'v14', 'v15', 'v16', 'v17', 'v18', 'v19', 'v20', 'v21',
-            # 'v22', 'v23', 'v24', 'v25', 'v26', 'v27', 'v28', 'v29', 'v30', 'v31',
-            # 'v32', 'v33',
-        ]
+        # columns_removed = [
+        #     'x0', 'x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'x7', 'x8', 'x9', 'x10',
+        #     'y0', 'y1', 'y2', 'y3', 'y4', 'y5', 'y6', 'y7', 'y8', 'y9', 'y10',
+        #     'z0', 'z1', 'z2', 'z3', 'z4', 'z5', 'z6', 'z7', 'z8', 'z9', 'z10',
+        #     'v0', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8', 'v9', 'v10',
+        #
+        #     # 'v12', 'v13', 'v14', 'v15', 'v16', 'v17', 'v18', 'v19', 'v20', 'v21',
+        #     # 'v22', 'v23', 'v24', 'v25', 'v26', 'v27', 'v28', 'v29', 'v30', 'v31',
+        #     # 'v32', 'v33',
+        # ]
         # xyz_data.drop(columns_removed, axis='columns', inplace=True)
         xyz_data.drop(xyz_data.filter(regex='z').columns, axis='columns', inplace=True)
         xyz_data.drop(xyz_data.filter(regex='v').columns, axis='columns', inplace=True)
+        self.data = xyz_data.copy()
+
+    def point_loc_process_by_side(self, side):
+        ''''Remove points 1 to points 11 of columns.'''
+        # headers = [*pd.read_csv(dataset_csv_file, nrows=1)]
+        # df1 = pd.read_csv(dataset_csv_file, usecols=[c for c in headers if c != 'name'])
+        xyz_data = self.dataframe.copy()
+        xyz_data.drop(xyz_data.filter(regex='z').columns, axis='columns', inplace=True)
+        xyz_data.drop(xyz_data.filter(regex='v').columns, axis='columns', inplace=True)
+        ind_to_remove = []
+        if side == RIGHT_SIDE:
+            ind_to_remove = left_point_list
+        elif side == LEFT_SIDE:
+            ind_to_remove = right_point_list
+        columns_removed = []
+        for ind in ind_to_remove:
+            if ind != 0:
+                columns_removed.append('x{}'.format(ind))
+                columns_removed.append('y{}'.format(ind))
+        xyz_data.drop(columns_removed, axis='columns', inplace=True)
         self.data = xyz_data.copy()
 
     def vec_dir_process(self):
@@ -114,6 +156,14 @@ class CsvDataset:
         self.__add_vec_dir_to_df(data, df)
         self.__add_cross_vec_dir_to_df(data, df)
         self.data = data.copy()
+
+    @staticmethod
+    def __add_vec_dir_one_side(add_to, data, side):
+        joint_lists = [right_tow_joints_list, left_tow_joints_list, front_tow_joints_list]
+        for ind, two_joints in enumerate(joint_lists[side]):
+            a = np.array([data['x' + str(two_joints[0])], data['y' + str(two_joints[0])]])
+            b = np.array([data['x' + str(two_joints[1])], data['y' + str(two_joints[1])]])
+            add_to['vec_dir' + str(ind)] = culc_vec_direction(a, b) / 360
 
     @staticmethod
     def __add_vec_dir_to_df(add_to, data):
@@ -178,6 +228,22 @@ class CsvDataset:
         for i in range(num_of_class):
             new_df = new_df.append(df[df["class"] == i].sample(n=min_num_samples))
         self.dataframe = new_df
+
+    def count_model_one_side_process(self, side):
+        df = self.dataframe
+        combine_data = pd.DataFrame()
+        combine_data['class'] = df['class']
+        self.__add_angle_one_side(combine_data, df, side)
+        self.__add_vec_dir_one_side(combine_data, df, side)
+        self.data = combine_data.copy()
+
+    def count_model_front_process(self, side):
+        df = self.dataframe
+        combine_data = pd.DataFrame()
+        combine_data['class'] = df['class']
+        self.__add_angle_one_side(combine_data, df, side)
+        self.__add_vec_dir_one_side(combine_data, df, side)
+        self.data = combine_data.copy()
 
 
 if __name__ == '__main__':

@@ -7,7 +7,8 @@ import mediapipe as mp
 import torch
 from genric_net.genric_net import load_network
 import numpy as np
-from tools.get_feature_vec import get_angle_vec_input, get_min_visability, get_angle_input, choose_side
+from tools.get_feature_vec import get_angle_vec_input, get_min_visability, get_angle_input, choose_side, \
+    get_min_visbility
 import csv
 import os
 from datetime import datetime
@@ -29,6 +30,29 @@ MIDDLE_POS = 2
 
 TIME_TO_CHECK_MISTAKES = 2000
 TIME_IN_START_POS_TO_START = 4000
+
+# general sounds
+COUNT_SOUND_5_REP = [r".\general_sound\5.mp3",
+                     r".\general_sound\עוד 10.mp3",
+                     r".\general_sound\עוד 15.mp3",
+                     r".\general_sound\עוד20.mp3",
+                     r".\general_sound\עוד 25.mp3",
+                     r".\general_sound\עוד 30.mp3",
+                     r".\general_sound\עוד 35.mp3",
+                     r".\general_sound\עוד 40.mp3"]
+
+COUNT_DOWN_5 = [
+    r".\general_sound\1.mp3",
+    r".\general_sound\2.mp3",
+    r".\general_sound\3.mp3",
+    r".\general_sound\4.mp3"]
+
+NOT_VIS_SOUND = r".\general_sound\not_vis.mp3"
+SOUND_VIS_DELAY = 10000
+
+BREAK_10_SEC = r".\general_sound\10sec_break.mp3"
+
+TAKE_BREAK_SOUND = r".\general_sound\take_break.mp3"
 
 
 class UserGui:
@@ -76,12 +100,11 @@ class UserGui:
     def init_media_pipe(self):
         # init video
         video_path = r"C:\Users\noam\Downloads\WhatsApp Video 2022-04-23 at 21.20.52.mp4"
+        video_path = r"C:\Users\noam\Downloads\correct_noam_left.mp4"
+        video_path = 1
         self.mp_pose = mp.solutions.pose
-        self.cap = cv2.VideoCapture(video_path)
+        self.cap = cv2.VideoCapture(1)
         self.mp_drawing = mp.solutions.drawing_utils
-
-    def crate_json_file(self):
-        pass
 
     def init_exercise(self, exercise_dict):
 
@@ -91,8 +114,8 @@ class UserGui:
         self.visible_flag = False
         self.is_exe_started = False
         self.is_exe_ended = False
-        self.visible_flag = False
         self.current_state = START_POS
+        self.is_vis_sound_used = False
 
         self.state_p, self.pos_state = 0, 0
 
@@ -110,21 +133,32 @@ class UserGui:
         self.n_reps = exercise_dict['num_of_reps']
         self.exercise_name = exercise_dict['name']
         self.break_between_sets = exercise_dict['break_time']
-        self.time_var = pygame.time.get_ticks()
         self.user_message = r'stand before the camera'
         self.start_state_err_map = exercise_dict['start_state_error_map']
         self.end_state_err_map = exercise_dict['end_state_error_map']
         self.middle_state_err_map = exercise_dict['middle_state_error_map']
         self.sound_arr = exercise_dict['err_message_sounds']
-
+        self.is_form_side = exercise_dict.get('is_from_side', False)  # if not exist default false
 
     def check_visability(self):
         if not self.visible_flag:
             self.user_message = r'the camera cant see you clearly'
             self.rec_color = RED_COLOR  # set rec color to red
-            is_right_side = choose_side(self.landmarks)  # choose the dominent visible side
-            angels_visability = get_min_visability(self.landmarks, is_right_side)
+            if self.is_form_side:
+                side_index = choose_side(self.landmarks)  # choose the dominent visible side
+                angels_visability = get_min_visability(self.landmarks, side_index)
+            else:
+                angels_visability = get_min_visbility(self.landmarks)
             self.visible_flag = not np.any(angels_visability < VIS_THRESHOLD)
+            if self.visible_flag:
+                self.time_var = pygame.time.get_ticks()
+            if not self.is_vis_sound_used:
+                self.is_vis_sound_used = True
+                self.vis_sound_time = pygame.time.get_ticks() + SOUND_VIS_DELAY
+            else:
+                if self.vis_sound_time < pygame.time.get_ticks() and self.vis_sound_time:
+                    pygame.mixer.Sound(NOT_VIS_SOUND).play(0)
+                    self.vis_sound_time = 0
 
     def check_exe_start(self):
         if not self.is_exe_started:  # Wait for the user to get into position (10 sec)
@@ -137,10 +171,10 @@ class UserGui:
                 mistake_p, mistake_ind = self.use_error_model(START_POS)
                 if mistake_p > MISTAKE_P_THRESHOLD:
                     self.state_mistake_arr[START_POS, mistake_ind] += 1
-
             if pygame.time.get_ticks() - self.time_var > TIME_IN_START_POS_TO_START:
                 # normalize arr
-                self.state_mistake_arr[START_POS, :] = self.state_mistake_arr[START_POS, :] / self.state_mistake_arr[START_POS, :].sum()
+                self.state_mistake_arr[START_POS, :] = self.state_mistake_arr[START_POS, :] / self.state_mistake_arr[
+                                                                                              START_POS, :].sum()
                 # check mistake threshold and update mistake for set
                 if np.any(self.state_mistake_arr[START_POS, 1:] > P_OF_REP):
                     self.time_var = pygame.time.get_ticks()
@@ -178,7 +212,7 @@ class UserGui:
                              [self.width - self.button_width, 0, self.button_width, self.button_height])
             text = smallfont.render("SKIP", True, color)
             self.Surface.blit(text, (
-            self.width - self.button_width + int(self.button_height / 2), int(self.button_height / 4)))
+                self.width - self.button_width + int(self.button_height / 2), int(self.button_height / 4)))
             # set counter
             pygame.draw.rect(self.Surface, color_light,
                              [2 * self.button_width, 0, self.button_width, self.button_height])
@@ -249,6 +283,7 @@ class UserGui:
 
         if state == START_POS and self.current_state == END_POS:
             self.rep_counter += 1
+            self.count_sound(self.n_reps - self.rep_counter)
             # normalize arr
             self.state_mistake_arr = self.state_mistake_arr / self.state_mistake_arr.sum(axis=1).reshape([3, 1])
             # check mistake threshold and update mistake for set
@@ -262,9 +297,11 @@ class UserGui:
             self.end_set()
         if self.set_counter >= self.n_sets:
             self.is_exe_ended = True
+            self.update_gui()
             # TODO handle error if needed
             # take brake
-            self.count_down()
+            pygame.mixer.Sound(TAKE_BREAK_SOUND).play(0)
+            # self.count_down()
             pass
 
     def run_exercise(self, exercise_ind):
@@ -284,12 +321,11 @@ class UserGui:
                 # Recolor back to BGR
                 try:
                     self.landmarks = results.pose_landmarks.landmark
+                    self.state_p, self.pos_state = self.use_count_model()
                 except:
                     visibility = 0  # TODO check if needed
                     continue
                 # use the
-                self.state_p, self.pos_state = self.use_count_model()
-
                 if self.is_exe_started:
                     self.update_counter()
                     self.check_set()
@@ -302,15 +338,16 @@ class UserGui:
                     self.check_exe_start()
                 else:
                     self.check_visability()
-
                 self.update_gui()
+                if self.is_exe_ended:
+                    return
 
                 # check if user is in place
 
     def get_num_of_exercise(self):
         return len(self.exercises_list)
 
-    def count_down(self, time_sec, skip_message="skip break"):
+    def count_down(self, time_sec, skip_message="skip break", sound_on=True):
         font = pygame.font.SysFont(None, 100)
         counter = time_sec
         text = font.render(str(counter), True, (0, 128, 0))
@@ -318,10 +355,15 @@ class UserGui:
         pygame.time.set_timer(timer_event, 1000)
         run = True
         while run:
-            self.clock.tick(60)
+            self.clock.tick(100)
             for event in pygame.event.get():
                 if event.type == timer_event:
                     text = font.render(str(counter), True, (0, 128, 0))
+                    if sound_on:
+                        if counter == 10:
+                            pygame.mixer.Sound(BREAK_10_SEC).play(0)
+                        elif counter < 6:
+                            self.count_sound(counter)
                     counter -= 1
                     if counter == 0:
                         pygame.time.set_timer(timer_event, 0)
@@ -340,7 +382,6 @@ class UserGui:
                              [self.width - self.button_width, 0, self.button_width, self.button_height])
             skip_text = font.render(skip_message, True, (255, 255, 255))
             self.Surface.blit(skip_text, (self.width - self.button_width + 10, int(self.button_height / 4)))
-
             pygame.display.flip()
 
     def end_gui(self):
@@ -379,6 +420,7 @@ class UserGui:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if self.user_message == '':
                     mouse = pygame.mouse.get_pos()
+                    # check if skip was clicked
                     if self.width - self.button_width <= mouse[0] <= self.width and 0 <= mouse[1] <= self.button_height:
                         self.end_set()
 
@@ -392,8 +434,6 @@ class UserGui:
             err_ind = self.middle_state_err_map[ind]
         # play err message
         pygame.mixer.Sound(self.sound_arr[err_ind]).play(0)
-
-
 
     def end_set(self):
         self.set_counter += 1
@@ -411,14 +451,22 @@ class UserGui:
 
         # TODO add error
         if self.break_between_sets:
+            pygame.mixer.Sound(TAKE_BREAK_SOUND).play(0)
             self.count_down(self.break_between_sets)
+
+    @staticmethod
+    def count_sound(count_ind):
+        if not count_ind % 5 and count_ind != 0:
+            pygame.mixer.Sound(COUNT_SOUND_5_REP[int(count_ind / 5) - 1]).play(0)
+        elif count_ind < 5:
+            pygame.mixer.Sound(COUNT_DOWN_5[count_ind - 1]).play(0)
 
 
 if __name__ == '__main__':
-    print('hi')
     gui = UserGui(r"exercise_plan.json")
     for exercise_ind in range(gui.get_num_of_exercise()):
         gui.run_exercise(0)
+    gui.update_plane_csv()
 
 #
 #
