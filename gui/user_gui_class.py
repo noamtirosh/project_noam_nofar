@@ -7,26 +7,33 @@ import mediapipe as mp
 import torch
 from genric_net.genric_net import load_network
 import numpy as np
-from tools.get_feature_vec import get_angle_vec_input, get_min_visability, get_angle_input, choose_side, \
-    get_min_visbility
+from tools.get_feature_vec import get_angle_input, choose_side, get_min_visbility, count_model_input_with_side, \
+    count_model_input, get_min_visability, get_point_loc_input_by_side
 import csv
 import os
 from datetime import datetime
+from train_model.conv_train_one_side import Classifier
 
 # const
 VIS_THRESHOLD = 0.80
 MISTAKE_P_THRESHOLD = 0.7
-STATE_POS_THRESHOLD = 0.97
-P_OF_REP = 0.4
-P_OF_SET = 0.2
+STATE_POS_THRESHOLD = 0.95
+P_OF_REP = 0.6
+P_OF_SET = 0.4
 
 RED_COLOR = (117, 16, 245)
 GREEN_COLOR = (117, 245, 16)
 BLACK_COLOR = (0, 0, 0)
+WITHE_COLOR = (255, 255, 255)
+LIGHT_COLOR = (170, 170, 170)
 
 START_POS = 0
 END_POS = 1
 MIDDLE_POS = 2
+
+RIGHT_SIDE = 0
+LEFT_SIDE = 1
+FRONT_SIDE = 2
 
 TIME_TO_CHECK_MISTAKES = 2000
 TIME_IN_START_POS_TO_START = 4000
@@ -46,6 +53,8 @@ COUNT_DOWN_5 = [
     r".\general_sound\2.mp3",
     r".\general_sound\3.mp3",
     r".\general_sound\4.mp3"]
+
+ERROR_MODEL_LIST = ['start_state_model_path', 'middle_state_model_path', 'end_state_model_path']
 
 NOT_VIS_SOUND = r".\general_sound\not_vis.mp3"
 SOUND_VIS_DELAY = 10000
@@ -75,17 +84,15 @@ class UserGui:
         self.init_media_pipe()
 
     def init_pygame(self):
-        global open_message, start_mes, almost_done
+        global open_message, start_mes
         # init gui
         pygame.init()
         pygame.mixer.init()
         self.clock = pygame.time.Clock()
         self.start_mes = pygame.mixer.Sound(r"start_pos.mp3")
-        almost_done = [r"good_job2.mp3", r"last_one.mp3", r"two_more.mp3", r"three_more.mp3"]
         Screen = max(pygame.display.list_modes())
         self.Surface = pygame.display.set_mode(Screen, FULLSCREEN)
         self.width = self.Surface.get_width()
-        # stores the height of the screen into a variable
         self.height = self.Surface.get_height()
         self.button_width = int(self.width / 5)
         self.button_height = int(self.height / 5)
@@ -99,11 +106,12 @@ class UserGui:
 
     def init_media_pipe(self):
         # init video
-        video_path = r"C:\Users\noam\Downloads\WhatsApp Video 2022-04-23 at 21.20.52.mp4"
-        video_path = r"C:\Users\noam\Downloads\correct_noam_left.mp4"
+        video_path = r"C:\Users\noam\Downloads\Nofar_test_right.mp4"
+        # video_path = r"C:\Users\noam\Downloads\correct_noam_left.mp4"
+        video_path = r"C:\Users\noam\Downloads\right.mp4"
         video_path = 1
         self.mp_pose = mp.solutions.pose
-        self.cap = cv2.VideoCapture(1)
+        self.cap = cv2.VideoCapture(video_path)
         self.mp_drawing = mp.solutions.drawing_utils
 
     def init_exercise(self, exercise_dict):
@@ -116,17 +124,16 @@ class UserGui:
         self.is_exe_ended = False
         self.current_state = START_POS
         self.is_vis_sound_used = False
-
+        self.side_to_use = FRONT_SIDE
         self.state_p, self.pos_state = 0, 0
-
+        self.start_state_mistake_flage = False
         self.state_mistake_arr = np.zeros([3, 5])
         self.set_mistake_arr = np.zeros([3, 5])
 
+        self.vis_sound_time = pygame.time.get_ticks() + SOUND_VIS_DELAY
+
         # get exercise params from json
-        self.count_model = load_network(exercise_dict['count_model_path'])
-        self.start_pos_model = load_network(exercise_dict['down_model_path'])
-        self.end_pos_model = load_network(exercise_dict['down_model_path'])
-        self.middle_pos_model = load_network(exercise_dict['down_model_path'])
+
         open_message_path = exercise_dict['open_message']
         self.open_message = pygame.mixer.Sound(open_message_path)
         self.n_sets = exercise_dict['num_of_sets']
@@ -139,24 +146,48 @@ class UserGui:
         self.middle_state_err_map = exercise_dict['middle_state_error_map']
         self.sound_arr = exercise_dict['err_message_sounds']
         self.is_form_side = exercise_dict.get('is_from_side', False)  # if not exist default false
+        # init models
+        if self.is_form_side:
+            self.count_right_net = load_network(exercise_dict['count_model_path'][RIGHT_SIDE])
+            self.count_left_net = load_network(exercise_dict['count_model_path'][LEFT_SIDE])
+        else:
+            self.count_model = load_network(exercise_dict['count_model_path'][0])
+        # init error models
+        self.err_models_arr = [[], [], []]
+        self.err_models_flag_arr = [False, False, False]
+        for err_model_ind, err_model_name in enumerate(ERROR_MODEL_LIST):
+            # if there is a error model use it
+            if exercise_dict[err_model_name]:
+                self.err_models_flag_arr[err_model_ind] = True
+                self.err_models_arr[err_model_ind].append(Classifier())
+                checkpoint = torch.load(exercise_dict[err_model_name][0])
+                self.err_models_arr[err_model_ind][0].load_state_dict(checkpoint)
+                if self.is_form_side:
+                    self.err_models_arr[err_model_ind].append(Classifier())
+                    checkpoint = torch.load(exercise_dict[err_model_name][1])
+                    self.err_models_arr[err_model_ind][1].load_state_dict(checkpoint)
 
     def check_visability(self):
-        if not self.visible_flag:
-            self.user_message = r'the camera cant see you clearly'
-            self.rec_color = RED_COLOR  # set rec color to red
-            if self.is_form_side:
-                side_index = choose_side(self.landmarks)  # choose the dominent visible side
-                angels_visability = get_min_visability(self.landmarks, side_index)
-            else:
-                angels_visability = get_min_visbility(self.landmarks)
-            self.visible_flag = not np.any(angels_visability < VIS_THRESHOLD)
-            if self.visible_flag:
+        self.user_message = r'the camera cant see you clearly'
+        self.rec_color = RED_COLOR  # set rec color to red
+        if self.is_form_side:
+            self.side_to_use = choose_side(self.landmarks)
+            angels_visability = get_min_visability(self.landmarks, self.side_to_use == RIGHT_SIDE)
+        else:
+            angels_visability = get_min_visbility(self.landmarks)
+        if not np.any(angels_visability < VIS_THRESHOLD):
+            self.vis_sound_time = pygame.time.get_ticks() + SOUND_VIS_DELAY
+            if not self.visible_flag:
                 self.time_var = pygame.time.get_ticks()
+                self.state_mistake_arr = np.zeros([3, 5])
+            self.visible_flag = True
+            self.rec_color = GREEN_COLOR
+            self.user_message = r'move to the start position'
+        else:
+            self.visible_flag = False
             if not self.is_vis_sound_used:
-                self.is_vis_sound_used = True
-                self.vis_sound_time = pygame.time.get_ticks() + SOUND_VIS_DELAY
-            else:
                 if self.vis_sound_time < pygame.time.get_ticks() and self.vis_sound_time:
+                    self.is_vis_sound_used = True
                     pygame.mixer.Sound(NOT_VIS_SOUND).play(0)
                     self.vis_sound_time = 0
 
@@ -171,61 +202,64 @@ class UserGui:
                 mistake_p, mistake_ind = self.use_error_model(START_POS)
                 if mistake_p > MISTAKE_P_THRESHOLD:
                     self.state_mistake_arr[START_POS, mistake_ind] += 1
+                else:
+                    self.state_mistake_arr[START_POS, 0] += 1
             if pygame.time.get_ticks() - self.time_var > TIME_IN_START_POS_TO_START:
                 # normalize arr
-                self.state_mistake_arr[START_POS, :] = self.state_mistake_arr[START_POS, :] / self.state_mistake_arr[
-                                                                                              START_POS, :].sum()
+                if np.any(self.state_mistake_arr[START_POS, :].sum() > 1):
+                    self.state_mistake_arr[START_POS, :] = self.state_mistake_arr[START_POS,
+                                                           :] / self.state_mistake_arr[
+                                                                START_POS, :].sum()
+                else:
+                    self.state_mistake_arr = np.zeros([3, 5])
                 # check mistake threshold and update mistake for set
-                if np.any(self.state_mistake_arr[START_POS, 1:] > P_OF_REP):
+                if np.any(self.state_mistake_arr[START_POS, 1:] > P_OF_REP) and not self.start_state_mistake_flage:
                     self.time_var = pygame.time.get_ticks()
+                    self.start_state_mistake_flage = True
+                    print("error: {}".format(1 + np.argmax(self.state_mistake_arr[START_POS, 1:])))
                     # TODO play error voice
+                    self.handle_err(START_POS, np.argmax(self.state_mistake_arr[START_POS, 1:]))
                 else:
                     self.is_exe_started = True
                     self.user_message = ''
                     self.start_mes.play(0)
                 # reset mistakes arrays
+
                 self.state_mistake_arr = np.zeros([3, 5])
 
     def update_gui(self):
         self.get_input()
 
-        # cv2.imshow('Mediapipe Feed', image)
-
         imS = cv2.resize(self.frame, (self.width, int(self.height * 4 / 5)))  # Resize image
         impg = pygame.image.frombuffer(imS.tobytes(), imS.shape[1::-1], "BGR")
         self.Surface.blit(impg, (0, int(self.height / 5)))
-        color_dark = (100, 100, 100)
-        color = (255, 255, 255)
-
-        # light shade of the button
-        color_light = (170, 170, 170)
 
         smallfont = pygame.font.SysFont('Corbel', int(self.button_height / 2))
 
         if self.user_message == '':
             # exercise name
-            pygame.draw.rect(self.Surface, color, [0, 0, 2 * self.button_width, self.button_height])
+            pygame.draw.rect(self.Surface, WITHE_COLOR, [0, 0, 2 * self.button_width, self.button_height])
             text = smallfont.render(str(self.exercise_name), True, BLACK_COLOR)
             self.Surface.blit(text, (0, int(self.height / 10) / 2))
             # skip button
             pygame.draw.rect(self.Surface, RED_COLOR,
                              [self.width - self.button_width, 0, self.button_width, self.button_height])
-            text = smallfont.render("SKIP", True, color)
+            text = smallfont.render("SKIP", True, WITHE_COLOR)
             self.Surface.blit(text, (
                 self.width - self.button_width + int(self.button_height / 2), int(self.button_height / 4)))
             # set counter
-            pygame.draw.rect(self.Surface, color_light,
+            pygame.draw.rect(self.Surface, LIGHT_COLOR,
                              [2 * self.button_width, 0, self.button_width, self.button_height])
             text = smallfont.render('SET', True, BLACK_COLOR)
             self.Surface.blit(text, (2 * self.button_width, 0))
-            text = smallfont.render(str(int(self.set_counter)) + '/' + str(int(self.n_sets)), True, color)
+            text = smallfont.render(str(int(self.set_counter)) + '/' + str(int(self.n_sets)), True, WITHE_COLOR)
             self.Surface.blit(text, (2 * self.button_width, int(self.button_height / 2)))
             # rep counter
             pygame.draw.rect(self.Surface, self.rec_color,
                              [3 * self.button_width, 0, self.button_width, self.button_height])
             text = smallfont.render('REPS', True, BLACK_COLOR)
             self.Surface.blit(text, (3 * self.button_width, 0))
-            text = smallfont.render(str(int(self.rep_counter)) + '/' + str(int(self.n_reps)), True, color)
+            text = smallfont.render(str(int(self.rep_counter)) + '/' + str(int(self.n_reps)), True, WITHE_COLOR)
             self.Surface.blit(text, (3 * self.button_width, int(self.height / 10)))
         else:
             # message to user
@@ -237,30 +271,44 @@ class UserGui:
         # cv2.imshow('Mediapipe Feed', imS)
 
     def use_count_model(self):
-        model_input = get_angle_vec_input(self.landmarks)
+        if self.is_form_side:
+            model_input = count_model_input_with_side(self.landmarks, self.side_to_use)
+        else:
+            model_input = count_model_input(self.landmarks)
         model_input = torch.Tensor(model_input)
         # Calculate the class probabilities (softmax) for img
         top_p, top_class_main = 0, 0
-        self.count_model.eval()
+        if self.is_form_side:
+            if self.side_to_use == RIGHT_SIDE:
+                count_model_to_use = self.count_right_net
+            else:
+                count_model_to_use = self.count_left_net
+        else:
+            count_model_to_use = self.count_model
+        count_model_to_use.eval()
         with torch.no_grad():
-            output = self.count_model.forward(model_input.view(1, 56))
+            if self.is_form_side:
+                output = count_model_to_use.forward(model_input.view(1, 14))
+            else:
+                output = count_model_to_use.forward(model_input.view(1, 28))
             ps = torch.exp(output)
             top_p, top_class_main = ps.topk(1, dim=1)
         return top_p, top_class_main
 
     def use_error_model(self, state):
-        error_input = get_angle_input(self.landmarks)  # TODO change if needed
-        error_input = torch.Tensor(error_input)
-        error_ind, error_p = 0, 0
-        with torch.no_grad():
-            if state == START_POS:
-                error_output = self.start_pos_model.forward(error_input.view(1, 24))
-            elif state == END_POS:
-                error_output = self.end_pos_model.forward(error_input.view(1, 24))
-            else:
-                error_output = self.middle_pos_model.forward(error_input.view(1, 24))
-            ps = torch.exp(error_output)
-            error_p, error_ind = ps.topk(1, dim=1)
+        error_p, error_ind = 0, 0
+        if self.err_models_flag_arr[state]:
+            error_input = get_point_loc_input_by_side(self.landmarks, self.side_to_use)  # TODO change if needed
+            error_input = torch.Tensor(error_input)
+            error_ind, error_p = 0, 0
+            with torch.no_grad():
+                if self.is_form_side:
+                    error_output = self.err_models_arr[state][self.side_to_use].forward(error_input.view(1, 34))
+                else:
+                    error_output = self.err_models_arr[state][0].forward(error_input.view(1, 66))
+                ps = torch.exp(error_output)
+                # print(ps)
+                error_p, error_ind = ps.topk(1, dim=1)
         return error_p, error_ind
 
     def update_counter(self):
@@ -284,10 +332,11 @@ class UserGui:
         if state == START_POS and self.current_state == END_POS:
             self.rep_counter += 1
             self.count_sound(self.n_reps - self.rep_counter)
-            # normalize arr
-            self.state_mistake_arr = self.state_mistake_arr / self.state_mistake_arr.sum(axis=1).reshape([3, 1])
-            # check mistake threshold and update mistake for set
-            self.set_mistake_arr[self.state_mistake_arr > P_OF_REP] += 1
+            if not np.any(self.state_mistake_arr.sum(axis=1) < 2):
+                # normalize arr
+                self.state_mistake_arr = self.state_mistake_arr / self.state_mistake_arr.sum(axis=1).reshape([3, 1])
+                # check mistake threshold and update mistake for set
+                self.set_mistake_arr[self.state_mistake_arr > P_OF_REP] += 1
             # reset mistakes arrays
             self.state_mistake_arr = np.zeros([3, 5])
             self.current_state = START_POS
@@ -317,27 +366,29 @@ class UserGui:
                     break
                 image = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
                 # Make detection
-                results = pose.process(image)
+                image.flags.writeable = False
                 # Recolor back to BGR
+                results = pose.process(image)
                 try:
                     self.landmarks = results.pose_landmarks.landmark
-                    self.state_p, self.pos_state = self.use_count_model()
                 except:
                     visibility = 0  # TODO check if needed
+                    if not self.is_exe_started:
+                        self.user_message = r'the camera cant see you clearly'
+                        self.rec_color = RED_COLOR
+                    self.update_gui()
                     continue
+
+                if not self.is_exe_started:
+                    self.check_visability()
+                    if self.visible_flag:
+                        self.state_p, self.pos_state = self.use_count_model()
+                        self.check_exe_start()
                 # use the
                 if self.is_exe_started:
+                    self.state_p, self.pos_state = self.use_count_model()
                     self.update_counter()
                     self.check_set()
-                    # count down at the end
-                    if self.rep_counter >= self.n_reps - 3:
-                        pygame.mixer.Sound(almost_done[self.n_reps - self.rep_counter]).play(0)
-                elif self.visible_flag:
-                    self.rec_color = GREEN_COLOR
-                    self.user_message = r'move to the start position'
-                    self.check_exe_start()
-                else:
-                    self.check_visability()
                 self.update_gui()
                 if self.is_exe_ended:
                     return
@@ -447,10 +498,12 @@ class UserGui:
         self.set_mistake_arr_only_err = self.set_mistake_arr[:, 1:]
         # check set threshold
         if np.any(self.set_mistake_arr_only_err > P_OF_SET):
-            ind = np.argmax(self.set_mistake_arr_only_err)
-
-        # TODO add error
+            state, ind = np.unravel_index(np.argmax(self.set_mistake_arr_only_err, axis=None),
+                                          self.set_mistake_arr_only_err.shape)
+            self.handle_err(state, ind)
+        self.set_mistake_arr = np.zeros([3, 5])
         if self.break_between_sets:
+            while pygame.mixer.get_busy(): pass
             pygame.mixer.Sound(TAKE_BREAK_SOUND).play(0)
             self.count_down(self.break_between_sets)
 
@@ -458,7 +511,7 @@ class UserGui:
     def count_sound(count_ind):
         if not count_ind % 5 and count_ind != 0:
             pygame.mixer.Sound(COUNT_SOUND_5_REP[int(count_ind / 5) - 1]).play(0)
-        elif count_ind < 5:
+        elif 0 < count_ind < 5:
             pygame.mixer.Sound(COUNT_DOWN_5[count_ind - 1]).play(0)
 
 

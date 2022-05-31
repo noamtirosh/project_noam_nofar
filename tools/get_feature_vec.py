@@ -20,7 +20,6 @@ front_tow_joints_list = []
 front_tow_joints_list.extend(right_tow_joints_list)
 front_tow_joints_list.extend(left_tow_joints_list)
 
-
 cross_body_joints_list = [[9, 10], [11, 12], [23, 24], [25, 26], [27, 28]]
 
 # right_list, left_list = [], []
@@ -32,6 +31,7 @@ cross_body_joints_list = [[9, 10], [11, 12], [23, 24], [25, 26], [27, 28]]
 #         left_list.append(joint.value)
 left_point_list = [0, 1, 2, 3, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]
 right_point_list = [0, 4, 5, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32]
+
 
 @dataclass
 class SceltonPoint:
@@ -105,7 +105,7 @@ def get_angles_by_side(scelton_points: np.ndarray, side: bool):
     """
     # Loop through joint sets
     angles = []
-    joint_lists = [right_joint_list,left_joint_list]
+    joint_lists = [right_joint_list, left_joint_list]
     joint_list = joint_lists[side]
     for joint in joint_list:
         a = np.array([scelton_points[joint[0]].x, scelton_points[joint[0]].y])  # First coord
@@ -138,11 +138,12 @@ def get_vectors(in_landmarks):
     model_input.extend(get_vectors(in_landmarks, True))
     return model_input
 
+
 # model_inputs func
 
 
 def count_model_input_with_side(in_landmarks, side):
-    model_input =[]
+    model_input = []
     angle_input = get_angles_by_side(in_landmarks, side)
     for i in range(len(angle_input)):
         model_input.append(angle_input[i] / 360)
@@ -172,13 +173,14 @@ def get_point_loc_input_by_side(in_landmarks, side):
     elif side == RIGHT_SIDE:
         landmarks_list = right_point_list
     else:
-        landmarks_list = [i for i in range(len(in_landmarks)+1)]
+        landmarks_list = [i for i in range(len(in_landmarks) + 1)]
     for joint_ind, joint in enumerate(in_landmarks):
         if joint_ind in landmarks_list:
             model_input.append(joint.x)
             model_input.append(joint.y)
         # model_input.append(joint.z)
     return model_input
+
 
 def get_conv_input(in_landmarks):
     model_input = []
@@ -238,7 +240,9 @@ def get_min_visability(scelton_points: np.ndarray, right_side: bool):
 def choose_side(scelton_points: np.ndarray):
     right_vis = np.mean(get_min_visability(scelton_points, True))
     left_vis = np.mean(get_min_visability(scelton_points, False))
-    return right_vis > left_vis
+    if right_vis > left_vis:
+        return RIGHT_SIDE
+    return LEFT_SIDE
 
 
 def get_angular_velocity(angels: np.ndarray, time):

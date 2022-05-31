@@ -1,19 +1,26 @@
 import json
-#Opening JSON file
+
+# Opening JSON file
 exercises_dict = {
     'exercises': [
         {
             'name': 'bridge',
-            'num_of_reps': 20,
+            'num_of_reps': 10,
             'num_of_sets': 4,
-            'break_time': 20,
-            'count_model_path': r".\models\count_model.pth",
-            'down_model_path': r".\models\down.pth",
-            'err_message_sounds': [r"good_job1.mp3", r"hands_fix.mp3", r"neck_fix.mp3", r"hip_fix.mp3"],
+            'break_time': 15,
+            'count_model_path': [r".\models\count_model_right_side1.pth", r".\models\count_model_left_side.pth"],
+            'start_state_model_path': [r".\models\conv_wight_down_right.pth",
+                                       r"C:\git_repos\project_noam_nofar\gui\models\conv_wight_down_left.pth"],
+            'middle_state_model_path': [],
+            'end_state_model_path': [],
+            'err_message_sounds': [r".\error_sounds\ידיים.mp3", r".\error_sounds\כפות רגליים.mp3",
+                                   r".\error_sounds\להרים ראש.mp3", r".\error_sounds\מצלמה.mp3"
+                                   ],
             'open_message': r"open_message.mp3",
-            'start_state_error_map': [0, 1],
-            'middle_state_error_map': [0],
-            'end_state_error_map': [0],
+            'start_state_error_map': [0, 1, 2, 3],
+            'middle_state_error_map': [0, 1, 2, 3],
+            'end_state_error_map': [0, 1, 2, 3],
+            'is_from_side': True
 
         }
     ],
