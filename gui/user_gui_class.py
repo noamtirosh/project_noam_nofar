@@ -20,7 +20,7 @@ from train_model.conv_count_train import CountClassifier
 VIS_THRESHOLD = 0.80
 MISTAKE_P_THRESHOLD = 0.5
 STATE_POS_THRESHOLD = 0.95
-P_OF_REP = 0.6
+P_OF_REP = 0.4
 P_OF_SET = 0.4
 
 RED_COLOR = (117, 16, 245)
@@ -37,8 +37,8 @@ RIGHT_SIDE = 0
 LEFT_SIDE = 1
 FRONT_SIDE = 2
 
-TIME_TO_CHECK_MISTAKES = 2000
-TIME_IN_START_POS_TO_START = 4000
+TIME_TO_CHECK_MISTAKES = 1000
+TIME_IN_START_POS_TO_START = 1000
 
 # general sounds
 COUNT_SOUND_5_REP = [r".\general_sound\5.mp3",
@@ -112,6 +112,7 @@ class UserGui:
         # video_path = r"C:\Users\noam\Downloads\correct_noam_left.mp4"
         video_path = r"C:\Users\noam\Downloads\right.mp4"
         video_path = 1
+        # video_path = r"C:\Users\noam\Downloads\squats_nofar_left2.mp4"
         self.mp_pose = mp.solutions.pose
         self.cap = cv2.VideoCapture(video_path)
         self.mp_drawing = mp.solutions.drawing_utils
@@ -510,7 +511,7 @@ class UserGui:
 
 
 if __name__ == '__main__':
-    gui = UserGui(r"exercise_plan.json")
+    gui = UserGui(r"exercise_squat_plan.json")
     for exercise_ind in range(gui.get_num_of_exercise()):
         gui.run_exercise(0)
     gui.update_plane_csv()
