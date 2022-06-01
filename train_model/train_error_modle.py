@@ -5,13 +5,14 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 from genric_net.genric_net import Network
 
-error_csv_path = r"C:\git_repos\project_noam_nofar\csv_files\down.csv"
+error_csv_path = r"C:\git_repos\project_noam_nofar\csv_files\new\down.csv"
 pose_datasets = CsvDataset(file=error_csv_path)
-pose_datasets.make_classes_samples_eq()
+# pose_datasets.make_classes_samples_eq()
 pose_datasets.add_miror()
+# pose_datasets.error_process()
 pose_datasets.vec_dir_process()
 train_dataset, validation_dataset = pose_datasets.df_to_datasets('class')
-model = Network(32, 3, [48, 33, 12], drop_p=0.5)
+model = Network(32, 2, [48, 33, 12], drop_p=0.5)
 
 
 # data_csv_file = r"C:\git_repos\project_noam_nofar\csv_files\up_down_classifiction.csv"
@@ -27,7 +28,7 @@ criterion = nn.NLLLoss()
 # optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-epochs = 20
+epochs = 4
 
 train_losses, test_losses = [], []
 for e in range(epochs):
@@ -81,10 +82,10 @@ plt.legend(frameon=False)
 # torch.save(checkpoint, 'checkpoint.pth')
 # torch.save(model.state_dict(), 'checkpoint_angle20.4.pth')
 checkpoint = {'input_size': 32,
-              'output_size': 3,
+              'output_size': 2,
               'hidden_layers': [each.out_features for each in model.hidden_layers],
               'state_dict': model.state_dict()}
 
-torch.save(checkpoint, 'down_model.pth')
+torch.save(checkpoint, 'down_test_new.pth')
 plt.show()
 

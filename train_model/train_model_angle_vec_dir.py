@@ -4,6 +4,7 @@ from tools.process_csv import CsvDataset
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 from genric_net.genric_net import Network
+from torchsummary import summary
 
 model = Network(56, 2, [48, 24, 12], drop_p=0.3)
 

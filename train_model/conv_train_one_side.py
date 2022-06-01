@@ -19,7 +19,7 @@ class Classifier(nn.Module):
         self.fc1 = nn.Linear(32*17, 16*17)
         self.fc2 = nn.Linear(16*17, 8*17)
         self.fc3 = nn.Linear(8*17, 4*17)
-        self.fc4 = nn.Linear(4*17, 5)
+        self.fc4 = nn.Linear(4*17, 4)
         # Dropout module with 0.3 drop probability
         self.dropout = nn.Dropout(p=0.3)
         self.batch = nn.BatchNorm1d(32)
@@ -55,10 +55,10 @@ class Classifier(nn.Module):
 
 if __name__ == '__main__':
 
-    error_csv_path = r"C:\git_repos\project_noam_nofar\csv_files\one_side_csv\error_models\down_right.csv"
+    error_csv_path = r"C:\git_repos\project_noam_nofar\csv_files\one_side_csv\error_models\down_left2.csv"
     pose_datasets = CsvDataset(file=error_csv_path)
-    # pose_datasets.make_classes_samples_eq()
-    pose_datasets.point_loc_process_by_side(RIGHT_SIDE)
+    pose_datasets.make_classes_samples_eq()
+    pose_datasets.point_loc_process_by_side(LEFT_SIDE)
     train_dataset, validation_dataset = pose_datasets.df_to_datasets('class')
 
 
@@ -76,10 +76,10 @@ if __name__ == '__main__':
     validation_data_loader = DataLoader(validation_dataset, batch_size=32, shuffle=True)
 
     criterion = nn.NLLLoss()
-    # optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
-    epochs = 7
+    epochs = 4
 
     train_losses, test_losses, accuracy = [], [], []
     for e in range(epochs):
@@ -131,7 +131,7 @@ if __name__ == '__main__':
     #               'hidden_layers': 12,
     #               'state_dict': model.state_dict()}
     # torch.save(checkpoint, 'checkpoint.pth')
-    torch.save(model.state_dict(), 'conv_wight_down_right.pth')
+    torch.save(model.state_dict(), 'conv_wight_down_left.pth')
     # checkpoint = {'input_size': 32,
     #               'output_size': 3,
     #               'hidden_layers': [each.out_features for each in model.hidden_layers],

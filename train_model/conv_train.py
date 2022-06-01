@@ -12,7 +12,7 @@ class Classifier(nn.Module):
         super().__init__()
         self.conv1 = nn.Conv1d(2, 16, 3,padding=1)
         self.fc1 = nn.Linear(16*33, 33)
-        self.fc2 = nn.Linear(33, 3)
+        self.fc2 = nn.Linear(33, 2)
 
         # self.fc4 = nn.Linear(64, 10)
         # Dropout module with 0.3 drop probability
@@ -33,7 +33,7 @@ class Classifier(nn.Module):
         # x = self.fc1(x)
         # x = F.relu(self.fc2(x))
         # x = F.relu(self.fc3(x))
-        x = F.relu(self.fc1(x))
+        x = self.dropout(F.relu(self.fc1(x)))
         x = self.fc2(x)
 
         x = F.log_softmax(x, dim=1)
@@ -43,12 +43,12 @@ class Classifier(nn.Module):
 
 if __name__ == '__main__':
 
-    # error_csv_path = r"C:\git_repos\project_noam_nofar\csv_files\down.csv"
-    error_csv_path = r"C:\git_repos\project_noam_nofar\csv_files\up_down_middle_classifiction.csv"
+    error_csv_path = r"C:\git_repos\project_noam_nofar\csv_files\down.csv"
+    # error_csv_path = r"C:\git_repos\project_noam_nofar\csv_files\up_down_middle_classifiction.csv"
     # error_csv_path  = "C:\git_repos\project_noam_nofar\csv_files\middle.csv"
     pose_datasets = CsvDataset(file=error_csv_path)
-    pose_datasets.make_classes_samples_eq()
-    pose_datasets.add_miror()
+    # pose_datasets.make_classes_samples_eq()
+    # pose_datasets.add_miror()
     pose_datasets.point_loc_process()
     train_dataset, validation_dataset = pose_datasets.df_to_datasets('class')
 
@@ -70,7 +70,7 @@ if __name__ == '__main__':
     # optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
-    epochs = 100
+    epochs = 3
 
     train_losses, test_losses, accuracy = [], [], []
     for e in range(epochs):
@@ -122,7 +122,7 @@ if __name__ == '__main__':
     #               'hidden_layers': 12,
     #               'state_dict': model.state_dict()}
     # torch.save(checkpoint, 'checkpoint.pth')
-    torch.save(model.state_dict(), 'conv_wight1.pth')
+    torch.save(model.state_dict(), 'conv_wight_down.pth')
     # checkpoint = {'input_size': 32,
     #               'output_size': 3,
     #               'hidden_layers': [each.out_features for each in model.hidden_layers],

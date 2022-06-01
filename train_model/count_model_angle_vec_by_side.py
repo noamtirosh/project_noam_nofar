@@ -9,14 +9,16 @@ from genric_net.genric_net import Network
 # in this model we assume that the user is with his side to the camera and we get only half of the point
 RIGHT_SIDE = 0
 LEFT_SIDE = 1
+side_to_use = RIGHT_SIDE
 
 model = Network(14, 2, [48, 24, 12], drop_p=0.3)
 
 if __name__ == '__main__':
-    right_side_data_csv_file = r"C:\git_repos\project_noam_nofar\csv_files\one_side_csv\count_model_csv\correct_left.csv"
+    right_side_data_csv_file = r"C:\git_repos\project_noam_nofar\csv_files\one_side_csv\count_model_csv\correct_right.csv"
+    # right_side_data_csv_file = r"C:\git_repos\project_noam_nofar\csv_files\one_side_csv\count_model_csv\count_with_err_right.csv"
     pose_datasets = CsvDataset(file=right_side_data_csv_file)
     # pose_datasets.make_classes_samples_eq()
-    pose_datasets.count_model_one_side_process(LEFT_SIDE)
+    pose_datasets.count_model_one_side_process(side_to_use)
     train_dataset, validation_dataset = pose_datasets.df_to_datasets('class')
     train_data_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     validation_data_loader = DataLoader(validation_dataset, batch_size=32, shuffle=True)
@@ -25,7 +27,7 @@ if __name__ == '__main__':
     optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
     # optimizer = optim.Adam(model.parameters(), lr=0.003)
 
-    epochs = 10
+    epochs = 5
 
     train_losses, test_losses, accuracy = [], [], []
     for e in range(epochs):
@@ -102,4 +104,4 @@ if __name__ == '__main__':
                   'hidden_layers': [each.out_features for each in model.hidden_layers],
                   'state_dict': model.state_dict()}
 
-    torch.save(checkpoint, 'count_model_left_side.pth')
+    torch.save(checkpoint, 'count_model_right_side.pth')

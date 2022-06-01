@@ -5,71 +5,27 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import numpy as np
+from genric_net.genric_net import Network
 
-RIGHT_SIDE = 0
-LEFT_SIDE = 1
-FRONT_SIDE = 2
+model = Network(69, 2, [24, 12, 6], drop_p=0.3)
 
-
-class CountClassifier(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv1d(2, 16, 3, padding=1)
-        self.conv2 = nn.Conv1d(16, 32, 3, padding=1)
-        self.fc1 = nn.Linear(32*17, 16*17)
-        self.fc2 = nn.Linear(16*17, 8*17)
-        self.fc3 = nn.Linear(8*17, 4*17)
-        self.fc4 = nn.Linear(4*17, 3)
-        # Dropout module with 0.3 drop probability
-        self.dropout = nn.Dropout(p=0.3)
-        self.batch = nn.BatchNorm1d(32)
-        self.flatten = nn.Flatten()
-
-    def forward(self, x):
-        # make sure input tensor is flattened
-        matrix_in = np.zeros([x.shape[0], 2, 17])
-        matrix_in[:, 0, :] = x[:, 0:34:2]
-        matrix_in[:, 1, :] = x[:, 1:34:2]
-
-        x = torch.Tensor(matrix_in)
-        # x = x.view(x.shape[0], -1)
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = self.dropout(self.batch(x))
-
-        x = self.flatten(x)
-        x = self.dropout(F.relu(self.fc1(x)))
-        x = self.dropout(F.relu(self.fc2(x)))
-        x = self.dropout(F.relu(self.fc3(x)))
-        # x = self.fc1(x)
-        # x = F.relu(self.fc2(x))
-        # x = F.relu(self.fc3(x))
-
-
-        x = self.fc4(x)
-
-        x = F.log_softmax(x, dim=1)
-
-        return x
 
 
 if __name__ == '__main__':
 
-    error_csv_path = r"C:\git_repos\project_noam_nofar\csv_files\one_side_csv\correct_right.csv"
-    error_csv_path = r"C:\git_repos\project_noam_nofar\csv_files\one_side_csv\count_model\count_with_err_right.csv"
-    error_csv_path = r"C:\git_repos\project_noam_nofar\csv_files\one_side_csv\squat\squats_correct_right.csv"
-
-    side_to_use = RIGHT_SIDE
+    # error_csv_path = r"C:\git_repos\project_noam_nofar\csv_files\down.csv"
+    error_csv_path  = r"C:\git_repos\project_noam_nofar\csv_files\new\up.csv"
+    # error_csv_path = r"C:\git_repos\project_noam_nofar\csv_files\up_down_middle_classifiction.csv"
     pose_datasets = CsvDataset(file=error_csv_path)
-    pose_datasets.make_classes_samples_eq()
-    pose_datasets.point_loc_process_by_side(side_to_use)
+    # pose_datasets.make_classes_samples_eq()
+    # pose_datasets.add_miror()
+    pose_datasets.media_pipe_example_process()
     train_dataset, validation_dataset = pose_datasets.df_to_datasets('class')
 
 
 
 
     # model = Network(32, 3, [48, 33, 12], drop_p=0.5)
-    model = CountClassifier()
     # data_csv_file = r"C:\git_repos\project_noam_nofar\csv_files\up_down_classifiction.csv"
     # pose_datasets = CsvDataset(file=data_csv_file)
     # pose_datasets.add_miror()
@@ -78,14 +34,13 @@ if __name__ == '__main__':
     # train_dataset, validation_dataset = pose_datasets.df_to_datasets('class')
     train_data_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     validation_data_loader = DataLoader(validation_dataset, batch_size=32, shuffle=True)
-
     criterion = nn.NLLLoss()
-    # optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+    optimizer = optim.Adam(model.parameters(), lr=0.003)
 
-    epochs = 7
+    epochs = 10
 
-    train_losses, test_losses, accuracy = [], [], []
+    train_losses, test_losses = [], []
     for e in range(epochs):
         tot_train_loss = 0
         for images, labels in train_data_loader:
@@ -121,7 +76,7 @@ if __name__ == '__main__':
             # At completion of epoch
             train_losses.append(train_loss)
             test_losses.append(test_loss)
-            accuracy.append(test_correct / len(validation_data_loader.dataset))
+
             print("Epoch: {}/{}.. ".format(e + 1, epochs),
                   "Training Loss: {:.3f}.. ".format(train_loss),
                   "Test Loss: {:.3f}.. ".format(test_loss),
@@ -130,21 +85,11 @@ if __name__ == '__main__':
     plt.plot(train_losses, label='Training loss')
     plt.plot(test_losses, label='Validation loss')
     plt.legend(frameon=False)
-    # checkpoint = {'input_size': 24,
-    #               'output_size': 2,
-    #               'hidden_layers': 12,
-    #               'state_dict': model.state_dict()}
-    # torch.save(checkpoint, 'checkpoint.pth')
-    torch.save(model.state_dict(), 'conv_count_squat_right.pth')
-    # checkpoint = {'input_size': 32,
-    #               'output_size': 3,
-    #               'hidden_layers': [each.out_features for each in model.hidden_layers],
-    #               'state_dict': model.state_dict()}
-    #
-    # torch.save(checkpoint, 'down_model.pth')
-    plt.show()
-    plt.plot(accuracy, label='accuracy')
-    plt.legend(frameon=False)
-    plt.title('Accuracy')
+    # torch.save(model.state_dict(), 'checkpoint_angle20.4.pth')
+    checkpoint = {'input_size': 69,
+                  'output_size': 2,
+                  'hidden_layers': [each.out_features for each in model.hidden_layers],
+                  'state_dict': model.state_dict()}
 
+    torch.save(checkpoint, 'mp_example_wight.pth')
     plt.show()
