@@ -13,10 +13,12 @@ import csv
 import os
 from datetime import datetime
 from train_model.conv_train_one_side import Classifier
+from train_model.conv_count_train import CountClassifier
+
 
 # const
 VIS_THRESHOLD = 0.80
-MISTAKE_P_THRESHOLD = 0.7
+MISTAKE_P_THRESHOLD = 0.5
 STATE_POS_THRESHOLD = 0.95
 P_OF_REP = 0.6
 P_OF_SET = 0.4
@@ -148,8 +150,12 @@ class UserGui:
         self.is_form_side = exercise_dict.get('is_from_side', False)  # if not exist default false
         # init models
         if self.is_form_side:
-            self.count_right_net = load_network(exercise_dict['count_model_path'][RIGHT_SIDE])
-            self.count_left_net = load_network(exercise_dict['count_model_path'][LEFT_SIDE])
+            self.count_right_net = CountClassifier()
+            checkpoint_r = torch.load(exercise_dict['count_model_path'][RIGHT_SIDE])
+            self.count_right_net.load_state_dict(checkpoint_r)
+            self.count_left_net = CountClassifier()
+            checkpoint_l = torch.load(exercise_dict['count_model_path'][LEFT_SIDE])
+            self.count_left_net.load_state_dict(checkpoint_l)
         else:
             self.count_model = load_network(exercise_dict['count_model_path'][0])
         # init error models
@@ -193,7 +199,7 @@ class UserGui:
 
     def check_exe_start(self):
         if not self.is_exe_started:  # Wait for the user to get into position (10 sec)
-            if not (self.pos_state == START_POS and self.state_p > STATE_POS_THRESHOLD):
+            if not (self.pos_state == START_POS):
                 self.time_var = pygame.time.get_ticks()
                 # reset mistakes arrays
                 self.state_mistake_arr = np.zeros([3, 5])
@@ -215,13 +221,14 @@ class UserGui:
                 # check mistake threshold and update mistake for set
                 if np.any(self.state_mistake_arr[START_POS, 1:] > P_OF_REP) and not self.start_state_mistake_flage:
                     self.time_var = pygame.time.get_ticks()
-                    self.start_state_mistake_flage = True
+                    self.start_state_mistake_flage = False
                     print("error: {}".format(1 + np.argmax(self.state_mistake_arr[START_POS, 1:])))
                     # TODO play error voice
                     self.handle_err(START_POS, np.argmax(self.state_mistake_arr[START_POS, 1:]))
                 else:
                     self.is_exe_started = True
                     self.user_message = ''
+                    while pygame.mixer.get_busy(): pass
                     self.start_mes.play(0)
                 # reset mistakes arrays
 
@@ -271,10 +278,7 @@ class UserGui:
         # cv2.imshow('Mediapipe Feed', imS)
 
     def use_count_model(self):
-        if self.is_form_side:
-            model_input = count_model_input_with_side(self.landmarks, self.side_to_use)
-        else:
-            model_input = count_model_input(self.landmarks)
+        model_input = get_point_loc_input_by_side(self.landmarks, self.side_to_use)
         model_input = torch.Tensor(model_input)
         # Calculate the class probabilities (softmax) for img
         top_p, top_class_main = 0, 0
@@ -288,9 +292,9 @@ class UserGui:
         count_model_to_use.eval()
         with torch.no_grad():
             if self.is_form_side:
-                output = count_model_to_use.forward(model_input.view(1, 14))
+                output = count_model_to_use.forward(model_input.view(1, 34))
             else:
-                output = count_model_to_use.forward(model_input.view(1, 28))
+                output = count_model_to_use.forward(model_input.view(1, 66))
             ps = torch.exp(output)
             top_p, top_class_main = ps.topk(1, dim=1)
         return top_p, top_class_main
@@ -312,19 +316,9 @@ class UserGui:
         return error_p, error_ind
 
     def update_counter(self):
-        state = START_POS
-        if self.state_p < STATE_POS_THRESHOLD:
-            # Middle_position
-            state = MIDDLE_POS
-        else:
-            if self.pos_state == START_POS:
-                # start state
-                state = START_POS
-            else:
-                # end position
-                state = END_POS
-                self.current_state = END_POS
-
+        state = int(self.pos_state)
+        if state == END_POS:
+            self.current_state = END_POS
         mistake_p, mistake_ind = self.use_error_model(state)
         if mistake_p > MISTAKE_P_THRESHOLD:
             self.state_mistake_arr[state, mistake_ind] += 1
